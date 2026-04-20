@@ -32,24 +32,34 @@ export async function processImage(
   let output: Buffer;
 
   if (mimeType === "image/png") {
-    output = await image.png({ compressionLevel: compressionOptions(level).png, adaptiveFiltering: true, effort: compressionOptions(level).effort }).toBuffer();
-    return withBestResult(bytes, output, "image/png", "png");
+    if (level === "low") {
+      output = await image.png({ compressionLevel: compressionOptions(level).png, adaptiveFiltering: true, effort: compressionOptions(level).effort }).toBuffer();
+      return withBestResult(bytes, output, "image/png", "png");
+    }
+
+    output = await image.webp({ quality: lossyQuality(level), effort: compressionOptions(level).effort, smartSubsample: true }).toBuffer();
+    return withBestResult(bytes, output, "image/webp", "webp");
   } else if (mimeType === "image/jpeg") {
-    return withOriginalType(bytes, mimeType);
+    if (level === "low") return withOriginalType(bytes, mimeType);
+    output = await image.jpeg({ quality: lossyQuality(level), mozjpeg: true }).toBuffer();
+    return withBestResult(bytes, output, "image/jpeg", "jpg");
   } else if (mimeType === "image/webp") {
-    output = await image.webp({ lossless: true, effort: compressionOptions(level).effort }).toBuffer();
+    output =
+      level === "low"
+        ? await image.webp({ lossless: true, effort: compressionOptions(level).effort }).toBuffer()
+        : await image.webp({ quality: lossyQuality(level), effort: compressionOptions(level).effort, smartSubsample: true }).toBuffer();
     return withBestResult(bytes, output, "image/webp", "webp");
   }
 
-  output = await image.jpeg({ quality: 98, mozjpeg: true }).toBuffer();
+  output = await image.jpeg({ quality: level === "low" ? 95 : lossyQuality(level), mozjpeg: true }).toBuffer();
   return { bytes: new Uint8Array(output), mimeType: "image/jpeg", extension: "jpg" };
 }
 
 async function loadSharp() {
   sharpLoader ??= import("sharp")
     .then((module) => module.default)
-    .catch(() => {
-      console.warn("Image compression unavailable; storing original images.");
+    .catch((error) => {
+      console.warn("Image compression unavailable; storing original images.", error);
       return null;
     });
 
@@ -60,6 +70,12 @@ function compressionOptions(level: CompressionLevel): { png: number; effort: num
   if (level === "high") return { png: 9, effort: 6 };
   if (level === "medium") return { png: 8, effort: 4 };
   return { png: 6, effort: 2 };
+}
+
+function lossyQuality(level: CompressionLevel): number {
+  if (level === "high") return 76;
+  if (level === "medium") return 86;
+  return 95;
 }
 
 function withBestResult(bytes: Uint8Array, output: Buffer, mimeType: ProcessedImage["mimeType"], extension: ProcessedImage["extension"]): ProcessedImage {

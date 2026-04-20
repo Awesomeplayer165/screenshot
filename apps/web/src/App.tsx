@@ -158,7 +158,7 @@ function UploadPage() {
   return (
     <main className="shell">
       <div className="ambient-background" aria-hidden="true" />
-      <Button className="admin-entry icon-button" variant="secondary" aria-label="Admin dashboard" onClick={() => (window.location.href = "/auth/login")}>
+      <Button className="admin-entry icon-button" variant="secondary" aria-label="Admin dashboard" onClick={() => (window.location.href = "/admin")}>
         <Settings size={16} />
       </Button>
       <section className="hero">

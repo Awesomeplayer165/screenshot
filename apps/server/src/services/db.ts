@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { AppSettings, UploadStatus } from "@screenshot/shared";
+import type { AdminStats, AppSettings, UploadStatus } from "@screenshot/shared";
 import { config } from "../config";
 
 export type UploadRecord = {
@@ -12,6 +12,9 @@ export type UploadRecord = {
   sizeBytes: number | null;
   storagePath: string | null;
   publicUrl: string | null;
+  downloadCount: number;
+  bytesServed: number;
+  lastAccessedAt: string | null;
   createdAt: string;
   completedAt: string | null;
   sha256: string | null;
@@ -40,6 +43,9 @@ const selectById = db.query<UploadRecord, [string]>(`
     extension,
     size_bytes AS sizeBytes,
     original_size_bytes AS originalSizeBytes,
+    download_count AS downloadCount,
+    bytes_served AS bytesServed,
+    last_accessed_at AS lastAccessedAt,
     storage_path AS storagePath,
     public_url AS publicUrl,
     created_at AS createdAt,
@@ -77,6 +83,9 @@ const listUploadsQuery = db.query<UploadRecord, [number]>(`
     extension,
     size_bytes AS sizeBytes,
     original_size_bytes AS originalSizeBytes,
+    download_count AS downloadCount,
+    bytes_served AS bytesServed,
+    last_accessed_at AS lastAccessedAt,
     storage_path AS storagePath,
     public_url AS publicUrl,
     created_at AS createdAt,
@@ -95,6 +104,9 @@ const listCompletedUploadsForCleanupQuery = db.query<UploadRecord, []>(`
     extension,
     size_bytes AS sizeBytes,
     original_size_bytes AS originalSizeBytes,
+    download_count AS downloadCount,
+    bytes_served AS bytesServed,
+    last_accessed_at AS lastAccessedAt,
     storage_path AS storagePath,
     public_url AS publicUrl,
     created_at AS createdAt,
@@ -106,6 +118,14 @@ const listCompletedUploadsForCleanupQuery = db.query<UploadRecord, []>(`
 `);
 
 const deleteUploadQuery = db.query(`DELETE FROM uploads WHERE id = ?`);
+const recordAssetDownloadQuery = db.query(`
+  UPDATE uploads
+  SET
+    download_count = download_count + 1,
+    bytes_served = bytes_served + ?,
+    last_accessed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  WHERE id = ? AND status = 'complete'
+`);
 const getSettingQuery = db.query<{ value: string }, [string]>(`SELECT value FROM settings WHERE key = ?`);
 const setSettingQuery = db.query(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`);
 const deleteSessionQuery = db.query(`DELETE FROM sessions WHERE id = ?`);
@@ -157,6 +177,10 @@ export function deleteUpload(id: string): boolean {
   return deleteUploadQuery.run(id).changes === 1;
 }
 
+export function recordAssetDownload(id: string, bytesServed: number): void {
+  recordAssetDownloadQuery.run(bytesServed, id);
+}
+
 export function getSetting(key: keyof AppSettings): string | null {
   return getSettingQuery.get(key)?.value ?? null;
 }
@@ -181,6 +205,101 @@ export function listCompletedUploadsForCleanup(): UploadRecord[] {
   return listCompletedUploadsForCleanupQuery.all();
 }
 
+export function getAdminStats(): AdminStats {
+  const rows = db
+    .query<{
+      id: string;
+      status: UploadStatus;
+      mimeType: string | null;
+      sizeBytes: number | null;
+      originalSizeBytes: number | null;
+      downloadCount: number;
+      bytesServed: number;
+      publicUrl: string | null;
+      createdAt: string;
+      completedAt: string | null;
+    }, []>(`
+      SELECT
+        id,
+        status,
+        mime_type AS mimeType,
+        size_bytes AS sizeBytes,
+        original_size_bytes AS originalSizeBytes,
+        download_count AS downloadCount,
+        bytes_served AS bytesServed,
+        public_url AS publicUrl,
+        created_at AS createdAt,
+        completed_at AS completedAt
+      FROM uploads
+    `)
+    .all();
+
+  let completedUploads = 0;
+  let failedUploads = 0;
+  let reservedUploads = 0;
+  let storageBytes = 0;
+  let originalBytes = 0;
+  let dataOutBytes = 0;
+  let downloadCount = 0;
+  const fileTypeMap = new Map<string, { label: string; count: number; bytes: number }>();
+  const dayMap = new Map<string, { date: string; uploads: number; bytes: number; downloads: number; bytesServed: number }>();
+
+  for (const row of rows) {
+    if (row.status === "complete") completedUploads += 1;
+    if (row.status === "failed") failedUploads += 1;
+    if (row.status === "reserved") reservedUploads += 1;
+
+    const sizeBytes = row.sizeBytes ?? 0;
+    const originalSizeBytes = row.originalSizeBytes ?? sizeBytes;
+    storageBytes += sizeBytes;
+    originalBytes += originalSizeBytes;
+    dataOutBytes += row.bytesServed;
+    downloadCount += row.downloadCount;
+
+    const type = row.mimeType ?? "reserved";
+    const typeEntry = fileTypeMap.get(type) ?? { label: type, count: 0, bytes: 0 };
+    typeEntry.count += 1;
+    typeEntry.bytes += sizeBytes;
+    fileTypeMap.set(type, typeEntry);
+
+    const date = (row.completedAt ?? row.createdAt).slice(0, 10);
+    const dayEntry = dayMap.get(date) ?? { date, uploads: 0, bytes: 0, downloads: 0, bytesServed: 0 };
+    dayEntry.uploads += row.status === "complete" ? 1 : 0;
+    dayEntry.bytes += sizeBytes;
+    dayEntry.downloads += row.downloadCount;
+    dayEntry.bytesServed += row.bytesServed;
+    dayMap.set(date, dayEntry);
+  }
+
+  const topDownloads = rows
+    .filter((row) => row.downloadCount > 0)
+    .sort((a, b) => b.downloadCount - a.downloadCount || b.bytesServed - a.bytesServed)
+    .slice(0, 8)
+    .map((row) => ({
+      id: row.id,
+      publicUrl: row.publicUrl,
+      downloadCount: row.downloadCount,
+      bytesServed: row.bytesServed
+    }));
+
+  return {
+    totalUploads: rows.length,
+    completedUploads,
+    failedUploads,
+    reservedUploads,
+    storageBytes,
+    originalBytes,
+    savedBytes: Math.max(0, originalBytes - storageBytes),
+    dataOutBytes,
+    downloadCount,
+    averageStoredBytes: completedUploads ? Math.round(storageBytes / completedUploads) : 0,
+    uploadToDownloadRatio: storageBytes > 0 ? dataOutBytes / storageBytes : 0,
+    fileTypes: Array.from(fileTypeMap.values()).sort((a, b) => b.bytes - a.bytes),
+    topDownloads,
+    recentDays: Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-14)
+  };
+}
+
 function runMigrations(): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -203,6 +322,10 @@ function runMigrations(): void {
             mime_type TEXT,
             extension TEXT,
             size_bytes INTEGER,
+            original_size_bytes INTEGER,
+            download_count INTEGER NOT NULL DEFAULT 0,
+            bytes_served INTEGER NOT NULL DEFAULT 0,
+            last_accessed_at TEXT,
             storage_path TEXT,
             public_url TEXT,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -231,6 +354,18 @@ function runMigrations(): void {
       id: "002_upload_original_size",
       run: () => {
         addColumnIfMissing("uploads", "original_size_bytes", "INTEGER");
+      }
+    },
+    {
+      id: "003_download_stats",
+      run: () => {
+        addColumnIfMissing("uploads", "download_count", "INTEGER NOT NULL DEFAULT 0");
+        addColumnIfMissing("uploads", "bytes_served", "INTEGER NOT NULL DEFAULT 0");
+        addColumnIfMissing("uploads", "last_accessed_at", "TEXT");
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_uploads_download_count ON uploads(download_count);
+          CREATE INDEX IF NOT EXISTS idx_uploads_last_accessed_at ON uploads(last_accessed_at);
+        `);
       }
     }
   ];

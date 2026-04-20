@@ -8,7 +8,7 @@ import { assets } from "./routes/assets";
 import { auth } from "./routes/auth";
 import { health } from "./routes/health";
 import { uploads } from "./routes/uploads";
-import { getCurrentUser } from "./services/auth";
+import { getCurrentUser, loginUrlFor } from "./services/auth";
 import { maybeRunCleanup } from "./services/cleanup";
 import { getSettings } from "./services/settings";
 import { ensureStorage } from "./services/storage";
@@ -60,7 +60,7 @@ app.use("*", async (c, next) => {
     !getCurrentUser(c)
   ) {
     if (c.req.method === "GET" && !pathname.startsWith("/api/")) {
-      return c.redirect("/auth/login");
+      return c.redirect(loginUrlFor(pathname, new URL(c.req.url).search));
     }
 
     return c.json({ error: "Authentication required" }, 401);

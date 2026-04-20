@@ -10,6 +10,7 @@ import { getOidcClientSecret, getSettings } from "./settings";
 const sessionCookie = "screenshot_session";
 const stateCookie = "screenshot_oidc_state";
 const nonceCookie = "screenshot_oidc_nonce";
+const returnToCookie = "screenshot_oidc_return_to";
 
 type Discovery = {
   authorization_endpoint: string;
@@ -51,6 +52,11 @@ export async function startLogin(c: Context): Promise<Response> {
     return c.json({ error: "OIDC is not configured" }, 503);
   }
 
+  const returnTo = safeReturnTo(c.req.query("returnTo")) ?? "/admin";
+  if (getCurrentUser(c)) {
+    return c.redirect(returnTo);
+  }
+
   const discovery = await getDiscovery();
   const state = createId(32);
   const nonce = createId(32);
@@ -65,6 +71,7 @@ export async function startLogin(c: Context): Promise<Response> {
 
   setShortCookie(c, stateCookie, state);
   setShortCookie(c, nonceCookie, nonce);
+  setShortCookie(c, returnToCookie, returnTo);
 
   return c.redirect(url.toString());
 }
@@ -77,11 +84,13 @@ export async function finishLogin(c: Context): Promise<Response> {
 
   const expectedState = getCookie(c, stateCookie);
   const expectedNonce = getCookie(c, nonceCookie);
+  const returnTo = safeReturnTo(getCookie(c, returnToCookie)) ?? "/admin";
   const state = c.req.query("state");
   const code = c.req.query("code");
 
   deleteCookie(c, stateCookie, cookieOptions());
   deleteCookie(c, nonceCookie, cookieOptions());
+  deleteCookie(c, returnToCookie, cookieOptions());
 
   if (!code || !state || !expectedState || state !== expectedState || !expectedNonce) {
     return c.redirect("/admin?error=invalid_oidc_state");
@@ -130,7 +139,7 @@ export async function finishLogin(c: Context): Promise<Response> {
     maxAge: 60 * 60 * 24 * 14
   });
 
-  return c.redirect("/admin?auth=callback");
+  return c.redirect(addCallbackMarker(returnTo));
 }
 
 export function logout(c: Context): Response {
@@ -170,6 +179,23 @@ function setShortCookie(c: Context, name: string, value: string): void {
     ...cookieOptions(),
     maxAge: 60 * 10
   });
+}
+
+export function loginUrlFor(pathname: string, search = ""): string {
+  const returnTo = safeReturnTo(`${pathname}${search}`) ?? "/admin";
+  return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+function safeReturnTo(value: string | undefined): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  if (value.startsWith("/auth/")) return null;
+  return value;
+}
+
+function addCallbackMarker(returnTo: string): string {
+  const url = new URL(returnTo, "http://screenshot.local");
+  url.searchParams.set("auth", "callback");
+  return `${url.pathname}${url.search}`;
 }
 
 function cookieOptions() {

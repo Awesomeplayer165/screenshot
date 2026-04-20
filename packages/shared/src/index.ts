@@ -43,11 +43,31 @@ export type AdminUpload = {
   extension: string | null;
   sizeBytes: number | null;
   originalSizeBytes: number | null;
+  downloadCount: number;
+  bytesServed: number;
+  lastAccessedAt: string | null;
   storagePath: string | null;
   publicUrl: string | null;
   createdAt: string;
   completedAt: string | null;
   sha256: string | null;
+};
+
+export type AdminStats = {
+  totalUploads: number;
+  completedUploads: number;
+  failedUploads: number;
+  reservedUploads: number;
+  storageBytes: number;
+  originalBytes: number;
+  savedBytes: number;
+  dataOutBytes: number;
+  downloadCount: number;
+  averageStoredBytes: number;
+  uploadToDownloadRatio: number;
+  fileTypes: Array<{ label: string; count: number; bytes: number }>;
+  topDownloads: Array<{ id: string; publicUrl: string | null; downloadCount: number; bytesServed: number }>;
+  recentDays: Array<{ date: string; uploads: number; bytes: number; downloads: number; bytesServed: number }>;
 };
 
 export type AppSettings = {
@@ -72,4 +92,5 @@ export type AdminSummary = {
   settings: AppSettings;
   uploads: AdminUpload[];
   storageBytes: number;
+  stats: AdminStats;
 };

@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import type { AdminSummary, AppSettings } from "@screenshot/shared";
-import { deleteUpload, findUpload, listUploads } from "../services/db";
+import { deleteUpload, findUpload, getAdminStats, listUploads } from "../services/db";
 import { requireUser } from "../services/auth";
+import { runManualCleanup } from "../services/cleanup";
 import { getSettings, updateSettings } from "../services/settings";
 import { deleteStoredAsset } from "../services/storage";
 
@@ -11,14 +12,19 @@ admin.use("*", requireUser);
 
 admin.get("/summary", (c) => {
   const uploads = listUploads(250);
-  const storageBytes = uploads.reduce((total, upload) => total + (upload.sizeBytes ?? 0), 0);
+  const stats = getAdminStats();
   const body: AdminSummary = {
     settings: getSettings(),
     uploads,
-    storageBytes
+    storageBytes: stats.storageBytes,
+    stats
   };
 
   return c.json(body);
+});
+
+admin.post("/prune", async (c) => {
+  return c.json(await runManualCleanup());
 });
 
 admin.put("/settings", async (c) => {

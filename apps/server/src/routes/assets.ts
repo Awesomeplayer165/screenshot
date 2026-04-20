@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Hono } from "hono";
 import { type ApiErrorResponse } from "@screenshot/shared";
-import { findUpload } from "../services/db";
+import { findUpload, recordAssetDownload } from "../services/db";
 
 export const assets = new Hono();
 
@@ -41,5 +41,6 @@ assets.on(["GET", "HEAD"], "/:file", async (c) => {
     return new Response(null, { headers });
   }
 
+  recordAssetDownload(id, fileStat.size);
   return new Response(Bun.file(record.storagePath), { headers });
 });

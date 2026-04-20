@@ -22,8 +22,12 @@ export async function maybeRunCleanup(force = false): Promise<void> {
   }
 }
 
-async function runCleanup(settings: AppSettings): Promise<void> {
-  if (settings.pruneDays <= 0 && settings.pruneGb <= 0) return;
+export async function runManualCleanup(): Promise<{ deleted: number; bytesDeleted: number }> {
+  return runCleanup(getSettings());
+}
+
+async function runCleanup(settings: AppSettings): Promise<{ deleted: number; bytesDeleted: number }> {
+  if (settings.pruneDays <= 0 && settings.pruneGb <= 0) return { deleted: 0, bytesDeleted: 0 };
 
   const uploads = listCompletedUploadsForCleanup();
   const toDelete = new Map<string, UploadRecord>();
@@ -52,8 +56,16 @@ async function runCleanup(settings: AppSettings): Promise<void> {
     }
   }
 
+  let deleted = 0;
+  let bytesDeleted = 0;
+
   for (const upload of toDelete.values()) {
     await deleteStoredAsset(upload.storagePath);
-    deleteUpload(upload.id);
+    if (deleteUpload(upload.id)) {
+      deleted += 1;
+      bytesDeleted += upload.sizeBytes ?? 0;
+    }
   }
+
+  return { deleted, bytesDeleted };
 }

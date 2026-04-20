@@ -14,11 +14,11 @@ The upload page accepts pasted, dropped, or selected images and immediately copi
 - Public inline asset serving from a separate asset origin.
 - Upload progress in the browser.
 - SQLite metadata and settings persistence.
-- Admin dashboard for upload management, search, filtering, sorting, bulk delete, and runtime settings.
+- Admin dashboard for upload management, date filtering, sorting, bulk delete, statistics, manual pruning, and runtime settings.
 - Generic OIDC login for admin access.
 - Optional OIDC protection for the upload UI.
 - Optional authentication for asset URLs.
-- Configurable image optimization levels. PNG and WebP are optimized losslessly. JPEG files are stored unchanged to avoid quality loss. HEIC and HEIF are converted to JPEG.
+- Configurable image optimization levels. Low is lossless where possible. Medium and high trade image quality for smaller files while preserving resolution. HEIC and HEIF are converted to JPEG.
 - Optional pruning by approximate file age and total stored size.
 - Automatic SQLite migrations on startup.
 - Docker and Docker Compose support.
@@ -70,6 +70,12 @@ docker compose up -d --build
 
 The container listens on port `3005` and stores images plus SQLite metadata in the `screenshot-data` volume.
 
+If you are upgrading an existing deployment after image-processing changes, rebuild the image instead of only restarting the old container:
+
+```sh
+docker compose up -d --build
+```
+
 ## Configuration
 
 Environment variables are for deployment identity, paths, and secrets. Runtime behavior is configured in the admin dashboard and persisted in SQLite.
@@ -110,6 +116,8 @@ openssl rand -base64 32
 Prune settings are intentionally approximate. Cleanup uses upload metadata in SQLite and runs on startup and opportunistically after uploads, avoiding expensive recursive folder scans.
 
 Database migrations are applied automatically on startup and tracked in `schema_migrations`.
+
+Upload statistics are stored with upload metadata. Asset GET requests increment download count and bytes served for each object.
 
 ## OIDC
 

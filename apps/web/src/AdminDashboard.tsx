@@ -1,19 +1,36 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowUpDown, Clipboard, ExternalLink, LogOut, RefreshCw, Save, Search, Settings, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpDown,
+  BarChart3,
+  Calendar,
+  Clipboard,
+  ExternalLink,
+  LogOut,
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+  Save,
+  Settings,
+  SlidersHorizontal,
+  Trash2
+} from "lucide-react";
 import type { AdminSummary, AdminUpload, AppSettings, ApiErrorResponse } from "@screenshot/shared";
 import { Button } from "./components/Button";
 import { Toast } from "./components/Toast";
 import { formatBytes } from "./lib/utils";
 
 type LoadState = "loading" | "ready" | "unauthorized" | "disabled" | "error";
-type SortKey = "createdAt" | "id" | "status" | "mimeType" | "sizeBytes";
+type SortKey = "createdAt" | "id" | "status" | "mimeType" | "sizeBytes" | "downloadCount";
 type SortDirection = "asc" | "desc";
+type AdminTab = "uploads" | "statistics" | "settings";
 
 export function AdminDashboard() {
   const [state, setState] = useState<LoadState>("loading");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("uploads");
 
   useEffect(() => {
     void loadSummary();
@@ -23,7 +40,7 @@ export function AdminDashboard() {
     if (state !== "unauthorized") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("auth") === "callback") return;
-    window.location.assign("/auth/login");
+    window.location.assign(`/auth/login?returnTo=${encodeURIComponent("/admin")}`);
   }, [state]);
 
   useEffect(() => {
@@ -97,6 +114,18 @@ export function AdminDashboard() {
     setToast("Upload deleted");
   }
 
+  async function runPrune() {
+    const response = await fetch("/api/admin/prune", { method: "POST" });
+    if (!response.ok) {
+      setToast(await errorFromResponse(response));
+      return;
+    }
+
+    const payload = (await response.json()) as { deleted: number; bytesDeleted: number };
+    setToast(payload.deleted === 0 ? "Prune ran. Nothing removed." : `Prune removed ${payload.deleted} files (${formatBytes(payload.bytesDeleted)}).`);
+    await loadSummary();
+  }
+
   if (state === "loading") {
     return <AdminSkeleton />;
   }
@@ -104,7 +133,7 @@ export function AdminDashboard() {
   if (state === "unauthorized") {
     return (
       <AdminShell title="Could not stay signed in" subtitle="OIDC completed, but the admin session cookie was not accepted. Check COOKIE_DOMAIN, PUBLIC_APP_ORIGIN, HTTPS, and SESSION_SECRET.">
-        <Button onClick={() => (window.location.href = "/auth/login")}>
+        <Button onClick={() => (window.location.href = `/auth/login?returnTo=${encodeURIComponent("/admin")}`)}>
           <ExternalLink size={16} />
           Sign in again
         </Button>
@@ -132,7 +161,7 @@ export function AdminDashboard() {
       <header className="admin-header">
         <div>
           <h1>Admin</h1>
-          <p>{summary.uploads.length} uploads · {formatBytes(summary.storageBytes)} stored</p>
+          <p>{summary.stats.completedUploads} complete · {formatBytes(summary.storageBytes)} stored · {summary.stats.downloadCount} downloads</p>
         </div>
         <div className="admin-header-actions">
           <Button variant="secondary" onClick={() => (window.location.href = "/")}>
@@ -152,111 +181,36 @@ export function AdminDashboard() {
         </div>
       </header>
 
-      <section className="admin-grid">
-        <div className="admin-card settings-card">
-          <div className="card-title">
-            <Settings size={18} />
-            <h2>Settings</h2>
-          </div>
+      <div className="admin-tabs">
+        <TabButton active={activeTab === "uploads"} onClick={() => setActiveTab("uploads")} icon={<Clipboard size={16} />} label="Uploads" />
+        <TabButton active={activeTab === "statistics"} onClick={() => setActiveTab("statistics")} icon={<BarChart3 size={16} />} label="Statistics" />
+        <TabButton active={activeTab === "settings"} onClick={() => setActiveTab("settings")} icon={<Settings size={16} />} label="Settings" />
+      </div>
 
-          <div className="settings-grid">
-            <div className="settings-section-title">Authentication</div>
-            <Toggle
-              label="Admin dashboard"
-              checked={settings.adminDashboardEnabled}
-              onChange={(adminDashboardEnabled) => setSettings({ ...settings, adminDashboardEnabled })}
-              url={`${settings.appOrigin}/admin`}
-            />
-            <Toggle
-              label="Upload UI"
-              checked={settings.uploadAuthRequired}
-              onChange={(uploadAuthRequired) => setSettings({ ...settings, uploadAuthRequired })}
-              url={settings.appOrigin}
-            />
-            <Toggle
-              label="Assets"
-              checked={settings.assetsAuthRequired}
-              onChange={(assetsAuthRequired) => setSettings({ ...settings, assetsAuthRequired })}
-              url={settings.assetOrigin}
-            />
-            <div className="settings-section-title">Upload</div>
-            <Toggle
-              label="Image compression"
-              checked={settings.imageCompressionEnabled}
-              onChange={(imageCompressionEnabled) => setSettings({ ...settings, imageCompressionEnabled })}
-            />
-            <label className="field">
-              <span>Compression level</span>
-              <select
-                value={settings.imageCompressionLevel}
-                onChange={(event) =>
-                  setSettings({
-                    ...settings,
-                    imageCompressionLevel: event.currentTarget.value as AppSettings["imageCompressionLevel"]
-                  })
-                }
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Upload limit MB</span>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={settings.maxUploadMb}
-                onChange={(event) => setSettings({ ...settings, maxUploadMb: Number(event.currentTarget.value) })}
-              />
-            </label>
-            <div className="settings-section-title">Prune</div>
-            <label className="field">
-              <span>Keep days</span>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={settings.pruneDays}
-                onChange={(event) => setSettings({ ...settings, pruneDays: Number(event.currentTarget.value) })}
-              />
-            </label>
-            <label className="field">
-              <span>Max folder GB</span>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={settings.pruneGb}
-                onChange={(event) => setSettings({ ...settings, pruneGb: Number(event.currentTarget.value) })}
-              />
-            </label>
-          </div>
+      {activeTab === "uploads" ? (
+        <section className="admin-single">
+          <UploadsTable
+            uploads={summary.uploads}
+            onDelete={(upload) => void deleteUpload(upload)}
+            onBulkDelete={(uploads) => {
+              void Promise.all(uploads.map((upload) => deleteUpload(upload)));
+            }}
+            onToast={setToast}
+          />
+        </section>
+      ) : null}
 
-          <div className="deployment-fields">
-            <div className="settings-section-title">Deployment</div>
-            <ReadOnlyField label="OIDC issuer" value={settings.oidcIssuerUrl || "Not configured"} />
-            <ReadOnlyField label="OIDC client ID" value={settings.oidcClientId || "Not configured"} />
-            <ReadOnlyField label="Redirect URI" value={settings.oidcRedirectUri || "Not configured"} />
-            <ReadOnlyField label="Allowed email" value={settings.adminEmail || "Not configured"} />
-          </div>
+      {activeTab === "statistics" ? (
+        <section className="admin-single">
+          <StatisticsPanel summary={summary} />
+        </section>
+      ) : null}
 
-          <Button onClick={() => void saveSettings()}>
-            <Save size={16} />
-            Save settings
-          </Button>
-        </div>
-
-        <UploadsTable
-          uploads={summary.uploads}
-          onDelete={(upload) => void deleteUpload(upload)}
-          onBulkDelete={(uploads) => {
-            void Promise.all(uploads.map((upload) => deleteUpload(upload)));
-          }}
-          onToast={setToast}
-        />
-      </section>
+      {activeTab === "settings" ? (
+        <section className="admin-single">
+          <SettingsPanel settings={settings} setSettings={setSettings} onSave={() => void saveSettings()} onPrune={() => void runPrune()} />
+        </section>
+      ) : null}
 
       <Toast message={toast} />
     </main>
@@ -281,6 +235,136 @@ function AdminShell({ title, subtitle, children }: { title: string; subtitle: st
         {children ? <div className="actions">{children}</div> : null}
       </div>
     </main>
+  );
+}
+
+function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
+  return (
+    <button className={`tab-button ${active ? "is-active" : ""}`} type="button" onClick={onClick}>
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function SettingsPanel({
+  settings,
+  setSettings,
+  onSave,
+  onPrune
+}: {
+  settings: AppSettings;
+  setSettings: (settings: AppSettings) => void;
+  onSave: () => void;
+  onPrune: () => void;
+}) {
+  return (
+    <div className="admin-card settings-card settings-page-card">
+      <div className="card-title">
+        <Settings size={18} />
+        <h2>Settings</h2>
+      </div>
+
+      <div className="settings-layout">
+        <div className="settings-grid">
+          <div className="settings-section-title">Authentication</div>
+          <Toggle
+            label="Admin dashboard"
+            checked={settings.adminDashboardEnabled}
+            onChange={(adminDashboardEnabled) => setSettings({ ...settings, adminDashboardEnabled })}
+            url={`${settings.appOrigin}/admin`}
+          />
+          <Toggle
+            label="Upload UI"
+            checked={settings.uploadAuthRequired}
+            onChange={(uploadAuthRequired) => setSettings({ ...settings, uploadAuthRequired })}
+            url={settings.appOrigin}
+          />
+          <Toggle
+            label="Assets"
+            checked={settings.assetsAuthRequired}
+            onChange={(assetsAuthRequired) => setSettings({ ...settings, assetsAuthRequired })}
+            url={settings.assetOrigin}
+          />
+
+          <div className="settings-section-title">Upload</div>
+          <Toggle
+            label="Image compression"
+            checked={settings.imageCompressionEnabled}
+            onChange={(imageCompressionEnabled) => setSettings({ ...settings, imageCompressionEnabled })}
+          />
+          <label className="field">
+            <span>Compression level</span>
+            <select
+              value={settings.imageCompressionLevel}
+              onChange={(event) =>
+                setSettings({
+                  ...settings,
+                  imageCompressionLevel: event.currentTarget.value as AppSettings["imageCompressionLevel"]
+                })
+              }
+            >
+              <option value="low">Low - lossless where possible</option>
+              <option value="medium">Medium - smaller files, light quality tradeoff</option>
+              <option value="high">High - smallest files, visible quality tradeoff</option>
+            </select>
+            <small className="field-hint">
+              Low keeps JPEGs unchanged and optimizes PNG/WebP losslessly. Medium and high may convert or recompress images to reduce file size while keeping resolution unchanged.
+            </small>
+          </label>
+          <label className="field">
+            <span>Upload limit MB</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={settings.maxUploadMb}
+              onChange={(event) => setSettings({ ...settings, maxUploadMb: Number(event.currentTarget.value) })}
+            />
+          </label>
+
+          <div className="settings-section-title">Prune</div>
+          <label className="field">
+            <span>Keep days</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={settings.pruneDays}
+              onChange={(event) => setSettings({ ...settings, pruneDays: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="field">
+            <span>Max folder GB</span>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={settings.pruneGb}
+              onChange={(event) => setSettings({ ...settings, pruneGb: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <div className="settings-actions">
+            <Button onClick={onSave}>
+              <Save size={16} />
+              Save settings
+            </Button>
+            <Button variant="secondary" onClick={onPrune}>
+              <Trash2 size={16} />
+              Run prune
+            </Button>
+          </div>
+        </div>
+
+        <div className="deployment-fields">
+          <div className="settings-section-title">Deployment</div>
+          <ReadOnlyField label="OIDC issuer" value={settings.oidcIssuerUrl || "Not configured"} />
+          <ReadOnlyField label="OIDC client ID" value={settings.oidcClientId || "Not configured"} />
+          <ReadOnlyField label="Redirect URI" value={settings.oidcRedirectUri || "Not configured"} />
+          <ReadOnlyField label="Allowed email" value={settings.adminEmail || "Not configured"} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -317,12 +401,14 @@ function UploadsTable({
   onBulkDelete: (uploads: AdminUpload[]) => void;
   onToast: (message: string) => void;
 }) {
-  const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [fullscreen, setFullscreen] = useState(false);
 
   const typeOptions = useMemo(() => {
     const values = new Set(uploads.map((upload) => upload.mimeType ?? "unknown"));
@@ -330,17 +416,20 @@ function UploadsTable({
   }, [uploads]);
 
   const rows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const fromTime = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
+    const toTime = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null;
 
     return uploads
       .filter((upload) => {
         if (statusFilter !== "all" && upload.status !== statusFilter) return false;
         if (typeFilter !== "all" && (upload.mimeType ?? "unknown") !== typeFilter) return false;
-        if (!normalizedQuery) return true;
-        return [upload.id, upload.mimeType, upload.publicUrl, upload.status].some((value) => value?.toLowerCase().includes(normalizedQuery));
+        const created = Date.parse(upload.createdAt);
+        if (fromTime !== null && created < fromTime) return false;
+        if (toTime !== null && created > toTime) return false;
+        return true;
       })
       .sort((a, b) => compareUploads(a, b, sortKey, sortDirection));
-  }, [uploads, query, statusFilter, typeFilter, sortKey, sortDirection]);
+  }, [uploads, fromDate, statusFilter, toDate, typeFilter, sortKey, sortDirection]);
 
   const allVisibleSelected = rows.length > 0 && rows.every((upload) => selected.has(upload.id));
   const selectedRows = rows.filter((upload) => selected.has(upload.id));
@@ -378,15 +467,22 @@ function UploadsTable({
   }
 
   return (
-    <div className="admin-card uploads-card">
-      <div className="card-title">
+    <div className={`admin-card uploads-card ${fullscreen ? "is-fullscreen" : ""}`}>
+      <div className="card-title card-title-with-action">
         <h2>Uploads</h2>
+        <Button className="icon-button" variant="secondary" aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen uploads"} onClick={() => setFullscreen(!fullscreen)}>
+          {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </Button>
       </div>
 
       <div className="table-toolbar">
-        <label className="search-field">
-          <Search size={15} />
-          <input value={query} placeholder="Search uploads" onChange={(event) => setQuery(event.currentTarget.value)} />
+        <label className="date-field">
+          <Calendar size={15} />
+          <input type="date" value={fromDate} onChange={(event) => setFromDate(event.currentTarget.value)} />
+        </label>
+        <label className="date-field">
+          <Calendar size={15} />
+          <input type="date" value={toDate} onChange={(event) => setToDate(event.currentTarget.value)} />
         </label>
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.currentTarget.value)}>
           <option value="all">All statuses</option>
@@ -427,6 +523,7 @@ function UploadsTable({
         <SortButton label="ID" active={sortKey === "id"} direction={sortDirection} onClick={() => toggleSort("id")} />
         <SortButton label="Type" active={sortKey === "mimeType"} direction={sortDirection} onClick={() => toggleSort("mimeType")} />
         <SortButton label="Size" active={sortKey === "sizeBytes"} direction={sortDirection} onClick={() => toggleSort("sizeBytes")} />
+        <SortButton label="Downloads" active={sortKey === "downloadCount"} direction={sortDirection} onClick={() => toggleSort("downloadCount")} />
         <SortButton label="Created" active={sortKey === "createdAt"} direction={sortDirection} onClick={() => toggleSort("createdAt")} />
         <span />
       </div>
@@ -441,6 +538,7 @@ function UploadsTable({
             </div>
             <span>{upload.mimeType ?? "reserved"}</span>
             <span>{upload.sizeBytes ? formatBytes(upload.sizeBytes) : "—"}</span>
+            <span>{upload.downloadCount}</span>
             <span>{new Date(upload.createdAt).toLocaleString()}</span>
             <div className="row-actions">
               {upload.publicUrl ? (
@@ -471,6 +569,94 @@ function UploadsTable({
   );
 }
 
+function StatisticsPanel({ summary }: { summary: AdminSummary }) {
+  const stats = summary.stats;
+  const maxDayBytes = Math.max(1, ...stats.recentDays.map((day) => Math.max(day.bytes, day.bytesServed)));
+  const maxTypeBytes = Math.max(1, ...stats.fileTypes.map((type) => type.bytes));
+
+  return (
+    <div className="stats-stack">
+      <div className="stats-grid">
+        <StatCard label="Stored" value={formatBytes(stats.storageBytes)} detail={`${stats.completedUploads} complete uploads`} />
+        <StatCard label="Saved" value={formatBytes(stats.savedBytes)} detail={`${formatPercent(stats.originalBytes ? stats.savedBytes / stats.originalBytes : 0)} smaller than originals`} />
+        <StatCard label="Data out" value={formatBytes(stats.dataOutBytes)} detail={`${stats.downloadCount} asset downloads`} />
+        <StatCard label="Out / stored" value={`${stats.uploadToDownloadRatio.toFixed(1)}x`} detail="Bandwidth compared with stored data" />
+      </div>
+
+      <div className="admin-card stats-card">
+        <div className="card-title">
+          <BarChart3 size={18} />
+          <h2>Recent Activity</h2>
+        </div>
+        <div className="activity-chart">
+          {stats.recentDays.map((day) => (
+            <div className="activity-day" key={day.date}>
+              <div className="bar-pair">
+                <span style={{ height: `${Math.max(8, (day.bytes / maxDayBytes) * 100)}%` }} title={`Uploaded ${formatBytes(day.bytes)}`} />
+                <span style={{ height: `${Math.max(8, (day.bytesServed / maxDayBytes) * 100)}%` }} title={`Served ${formatBytes(day.bytesServed)}`} />
+              </div>
+              <small>{new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</small>
+            </div>
+          ))}
+          {stats.recentDays.length === 0 ? <p>No activity yet.</p> : null}
+        </div>
+        <div className="chart-legend">
+          <span><i className="legend-upload" /> Uploaded</span>
+          <span><i className="legend-download" /> Served</span>
+        </div>
+      </div>
+
+      <div className="stats-two">
+        <div className="admin-card stats-card">
+          <div className="card-title">
+            <SlidersHorizontal size={18} />
+            <h2>File Types</h2>
+          </div>
+          <div className="type-bars">
+            {stats.fileTypes.map((type) => (
+              <div className="type-bar" key={type.label}>
+                <div>
+                  <strong>{type.label}</strong>
+                  <span>{type.count} files · {formatBytes(type.bytes)}</span>
+                </div>
+                <div className="type-track">
+                  <span style={{ width: `${Math.max(4, (type.bytes / maxTypeBytes) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="admin-card stats-card">
+          <div className="card-title">
+            <ExternalLink size={18} />
+            <h2>Top Downloads</h2>
+          </div>
+          <div className="top-downloads">
+            {stats.topDownloads.map((upload) => (
+              <button key={upload.id} type="button" onClick={() => upload.publicUrl && window.open(upload.publicUrl, "_blank")}>
+                <strong>{upload.id}</strong>
+                <span>{upload.downloadCount} downloads · {formatBytes(upload.bytesServed)}</span>
+              </button>
+            ))}
+            {stats.topDownloads.length === 0 ? <p>No downloads yet.</p> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="admin-card stat-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  );
+}
+
 function SortButton({
   label,
   active,
@@ -491,6 +677,10 @@ function SortButton({
   );
 }
 
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
 function compareUploads(a: AdminUpload, b: AdminUpload, key: SortKey, direction: SortDirection): number {
   const multiplier = direction === "asc" ? 1 : -1;
   const aValue = valueForSort(a, key);
@@ -503,6 +693,7 @@ function compareUploads(a: AdminUpload, b: AdminUpload, key: SortKey, direction:
 function valueForSort(upload: AdminUpload, key: SortKey): string | number {
   if (key === "createdAt") return Date.parse(upload.createdAt);
   if (key === "sizeBytes") return upload.sizeBytes ?? 0;
+  if (key === "downloadCount") return upload.downloadCount;
   return upload[key] ?? "";
 }
 

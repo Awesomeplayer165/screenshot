@@ -2,6 +2,8 @@
 
 Self-hosted screenshot upload service built with Bun, Hono, TypeScript, React, and local disk storage.
 
+![Upload UI](docs/media/screenshot-upload-ui.png)
+
 The upload page accepts pasted, dropped, or selected images and immediately copies a public asset URL while the upload continues. The intended flow is: open the page, paste a screenshot, return to the app where you want to share it, and paste the copied link. In normal use the image should be uploaded by the time the receiving app expands the URL.
 
 ## Features

@@ -33,5 +33,10 @@ export function looksLikeImage(bytes: Uint8Array, mime: SupportedImageType): boo
     );
   }
 
+  if (mime === "image/heic" || mime === "image/heif") {
+    const brand = String.fromCharCode(...bytes.slice(4, 12));
+    return brand.startsWith("ftyp") && /heic|heix|hevc|hevx|mif1|msf1/.test(brand + String.fromCharCode(...bytes.slice(12, 32)));
+  }
+
   return false;
 }

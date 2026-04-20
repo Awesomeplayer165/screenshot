@@ -21,7 +21,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -33,6 +34,7 @@ input {
   place-items: center;
   padding: 24px;
   background: #060708;
+  animation: page-fade-in 420ms ease both;
 }
 
 .ambient-background {
@@ -67,6 +69,13 @@ input {
   position: relative;
   z-index: 1;
   width: min(100%, 720px);
+}
+
+.admin-entry {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
 }
 
 .upload-panel {
@@ -334,6 +343,7 @@ p {
     linear-gradient(315deg, rgba(204, 90, 59, 0.13), transparent 38%),
     #060708;
   color: #f4f7f5;
+  animation: page-fade-in 420ms ease both;
 }
 
 .admin-center {
@@ -457,7 +467,10 @@ p {
   white-space: nowrap;
 }
 
-.field input {
+.field input,
+.field select,
+.table-toolbar select,
+.search-field input {
   width: 100%;
   min-width: 0;
   height: 40px;
@@ -469,7 +482,10 @@ p {
   outline: none;
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus,
+.table-toolbar select:focus,
+.search-field input:focus {
   border-color: rgba(91, 190, 205, 0.52);
 }
 
@@ -496,9 +512,92 @@ p {
   gap: 10px;
 }
 
+.table-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px 180px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.search-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 11px;
+  color: #9bacaa;
+  border: 1px solid rgba(244, 247, 245, 0.13);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.search-field input {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.bulk-row,
+.check-row,
+.upload-table-header {
+  display: flex;
+  align-items: center;
+}
+
+.bulk-row {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.check-row {
+  gap: 8px;
+  color: #9bacaa;
+  font-size: 13px;
+}
+
+.check-row input,
+.upload-row input[type="checkbox"] {
+  accent-color: #5bbed0;
+}
+
+.upload-table-header {
+  display: grid;
+  grid-template-columns: 22px minmax(110px, 1fr) minmax(110px, 0.8fr) 90px minmax(140px, 1fr) 124px;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 0 12px;
+}
+
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0;
+  color: #6f7d7a;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sort-button.is-active {
+  color: #d8fbff;
+}
+
+.sort-button small {
+  color: #6f7d7a;
+  font-size: 11px;
+}
+
 .upload-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: 22px minmax(110px, 1fr) minmax(110px, 0.8fr) 90px minmax(140px, 1fr) 124px;
   gap: 14px;
   align-items: center;
   padding: 12px;
@@ -527,6 +626,46 @@ p {
 .row-actions .button {
   width: 38px;
   padding: 0;
+}
+
+.skeleton {
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.25s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: 140px;
+  height: 38px;
+}
+
+.skeleton-line {
+  width: 210px;
+  height: 16px;
+  margin-top: 10px;
+}
+
+.skeleton-line.wide {
+  width: 72%;
+}
+
+.skeleton-button {
+  width: 112px;
+  height: 42px;
+}
+
+.skeleton-block {
+  width: 100%;
+  height: 56px;
+  margin-top: 12px;
+}
+
+.skeleton-row {
+  width: 100%;
+  height: 54px;
+  margin-top: 10px;
 }
 
 .spin {
@@ -558,6 +697,24 @@ p {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
   }
 }
 
@@ -623,11 +780,13 @@ p {
     flex-wrap: wrap;
   }
 
-  .admin-grid {
+  .table-toolbar,
+  .upload-table-header,
+  .upload-row {
     grid-template-columns: 1fr;
   }
 
-  .upload-row {
+  .admin-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Clipboard, ExternalLink, ImagePlus, Loader2, Upload, XCircle } from "lucide-react";
+import { Check, Clipboard, ExternalLink, ImagePlus, Loader2, Settings, Upload, XCircle } from "lucide-react";
 import type {
   ApiErrorResponse,
   ReserveUploadRequest,
@@ -21,9 +21,11 @@ type CurrentUpload = {
   progress: number;
   state: UploadState;
   error: string | null;
+  originalSizeBytes: number | null;
+  uploadedSizeBytes: number | null;
 };
 
-const SUPPORTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const SUPPORTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"]);
 
 export function App() {
   if (window.location.pathname.startsWith("/admin")) return <AdminDashboard />;
@@ -51,7 +53,7 @@ function UploadPage() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 2600);
+    const timer = window.setTimeout(() => setToast(null), 4800);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
@@ -59,7 +61,7 @@ function UploadPage() {
     activeXhrRef.current?.abort();
 
     if (!SUPPORTED_TYPES.has(file.type)) {
-      showError(file, "Only PNG, JPEG, and WebP images are supported.");
+      showError(file, "Only PNG, JPEG, WebP, HEIC, and HEIF images are supported.");
       return;
     }
 
@@ -70,16 +72,18 @@ function UploadPage() {
       assetUrl: "",
       progress: 0,
       state: "reserved",
-      error: null
+      error: null,
+      originalSizeBytes: null,
+      uploadedSizeBytes: null
     });
 
     try {
       const reserved = await reserveUpload(file.type);
       try {
         await copyToClipboard(reserved.assetUrl);
-        setToast("Link copied");
+        setToast("Link copied. Switch apps now; upload will finish in the background.");
       } catch {
-        setToast("Link ready");
+        setToast("Link ready. Switch apps now; upload will finish in the background.");
       }
 
       setUpload((current) =>
@@ -109,7 +113,9 @@ function UploadPage() {
               ...current,
               assetUrl: completed.assetUrl,
               progress: 100,
-              state: "complete"
+              state: "complete",
+              originalSizeBytes: completed.originalSizeBytes,
+              uploadedSizeBytes: completed.sizeBytes
             }
           : current
       );
@@ -135,7 +141,9 @@ function UploadPage() {
       assetUrl: "",
       progress: 0,
       state: "error",
-      error
+      error,
+      originalSizeBytes: file.size,
+      uploadedSizeBytes: null
     });
     setToast(error);
   }
@@ -145,11 +153,14 @@ function UploadPage() {
   }
 
   const statusTitle = upload ? titleForState(upload.state) : "Paste a screenshot";
-  const statusText = upload ? detailForUpload(upload) : "Paste, drop an image, or click the icon.";
+  const statusText = upload ? detailForUpload(upload) : "Paste, drop an image, or click below to select.";
 
   return (
     <main className="shell">
       <div className="ambient-background" aria-hidden="true" />
+      <Button className="admin-entry icon-button" variant="secondary" aria-label="Admin dashboard" onClick={() => (window.location.href = "/auth/login")}>
+        <Settings size={16} />
+      </Button>
       <section className="hero">
         <div
           className={`upload-panel ${dragActive ? "is-dragging" : ""} ${upload?.state === "complete" ? "is-complete" : ""}`}
@@ -246,7 +257,7 @@ function UploadPage() {
           ref={fileInputRef}
           className="file-input"
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
           onChange={(event) => {
             const file = imageFromFileList(event.currentTarget.files);
             event.currentTarget.value = "";
@@ -343,9 +354,13 @@ function titleForState(state: UploadState): string {
 }
 
 function detailForUpload(upload: CurrentUpload): string {
-  if (upload.state === "complete") return `${formatBytes(upload.file.size)} image uploaded.`;
+  if (upload.state === "complete") {
+    const original = upload.originalSizeBytes ?? upload.file.size;
+    const uploaded = upload.uploadedSizeBytes ?? original;
+    return `Image uploaded. ${formatBytes(original)} --> ${formatBytes(uploaded)}.`;
+  }
   if (upload.state === "error") return "The link was not created for this image.";
-  if (upload.assetUrl) return "The link is already copied. Keep this tab open until the upload finishes.";
+  if (upload.assetUrl) return "The link is already copied. Switch apps now; upload will finish in the background.";
   return `${formatBytes(upload.file.size)} image selected.`;
 }
 

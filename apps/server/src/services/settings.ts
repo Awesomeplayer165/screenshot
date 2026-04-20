@@ -1,4 +1,4 @@
-import type { AppSettings } from "@screenshot/shared";
+import type { AppSettings, CompressionLevel } from "@screenshot/shared";
 import { config } from "../config";
 import { getSetting, setSetting } from "./db";
 
@@ -19,6 +19,11 @@ function stringSetting(key: keyof AppSettings, fallback: string): string {
   return getSetting(key) ?? fallback;
 }
 
+function compressionLevelSetting(): CompressionLevel {
+  const value = stringSetting("imageCompressionLevel", config.imageCompressionLevel);
+  return value === "medium" || value === "high" ? value : "low";
+}
+
 export function getSettings(): AppSettings {
   const oidcIssuerUrl = stringSetting("oidcIssuerUrl", config.oidcIssuerUrl);
   const oidcClientId = stringSetting("oidcClientId", config.oidcClientId);
@@ -31,6 +36,7 @@ export function getSettings(): AppSettings {
     assetsAuthRequired: booleanSetting("assetsAuthRequired", config.assetsAuthRequired),
     maxUploadMb: numberSetting("maxUploadMb", config.defaultUploadLimitMb),
     imageCompressionEnabled: booleanSetting("imageCompressionEnabled", config.imageCompressionEnabled),
+    imageCompressionLevel: compressionLevelSetting(),
     oidcIssuerUrl,
     oidcClientId,
     oidcRedirectUri,
@@ -55,7 +61,7 @@ export function updateSettings(input: Partial<AppSettings> & { oidcClientSecret?
     setSetting("maxUploadMb", String(input.maxUploadMb));
   }
 
-  const strings: Array<keyof AppSettings> = ["oidcIssuerUrl", "oidcClientId", "oidcRedirectUri", "adminEmail"];
+  const strings: Array<keyof AppSettings> = ["imageCompressionLevel", "oidcIssuerUrl", "oidcClientId", "oidcRedirectUri", "adminEmail"];
   for (const key of strings) {
     const value = input[key];
     if (typeof value === "string") setSetting(key, value.trim());

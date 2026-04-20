@@ -23,44 +23,9 @@ mkdirSync(dirname(dbPath), { recursive: true });
 
 export const db = new Database(dbPath);
 
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA foreign_keys = ON;
+db.exec(`PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;`);
 
-  CREATE TABLE IF NOT EXISTS uploads (
-    id TEXT PRIMARY KEY NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('reserved', 'complete', 'failed')),
-    mime_type TEXT,
-    extension TEXT,
-    size_bytes INTEGER,
-    original_size_bytes INTEGER,
-    storage_path TEXT,
-    public_url TEXT,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    completed_at TEXT,
-    sha256 TEXT
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_uploads_created_at ON uploads(created_at);
-  CREATE INDEX IF NOT EXISTS idx_uploads_status ON uploads(status);
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY NOT NULL,
-    email TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    expires_at TEXT NOT NULL
-  );
-`);
-
-const columns = db.query<{ name: string }, []>(`PRAGMA table_info(uploads)`).all().map((column) => column.name);
-if (!columns.includes("original_size_bytes")) {
-  db.exec(`ALTER TABLE uploads ADD COLUMN original_size_bytes INTEGER`);
-}
+runMigrations();
 
 const insertReserved = db.query(`
   INSERT INTO uploads (id, status, public_url)
@@ -192,4 +157,74 @@ export function findSession(id: string): { id: string; email: string; expiresAt:
 
 export function deleteSession(id: string): void {
   deleteSessionQuery.run(id);
+}
+
+function runMigrations(): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id TEXT PRIMARY KEY NOT NULL,
+      applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+  `);
+
+  const appliedQuery = db.query<{ id: string }, [string]>(`SELECT id FROM schema_migrations WHERE id = ?`);
+  const markApplied = db.query(`INSERT INTO schema_migrations (id) VALUES (?)`);
+
+  const migrations: Array<{ id: string; run: () => void }> = [
+    {
+      id: "001_initial_schema",
+      run: () => {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS uploads (
+            id TEXT PRIMARY KEY NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('reserved', 'complete', 'failed')),
+            mime_type TEXT,
+            extension TEXT,
+            size_bytes INTEGER,
+            storage_path TEXT,
+            public_url TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            completed_at TEXT,
+            sha256 TEXT
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_uploads_created_at ON uploads(created_at);
+          CREATE INDEX IF NOT EXISTS idx_uploads_status ON uploads(status);
+
+          CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY NOT NULL,
+            email TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            expires_at TEXT NOT NULL
+          );
+        `);
+      }
+    },
+    {
+      id: "002_upload_original_size",
+      run: () => {
+        addColumnIfMissing("uploads", "original_size_bytes", "INTEGER");
+      }
+    }
+  ];
+
+  for (const migration of migrations) {
+    if (appliedQuery.get(migration.id)) continue;
+    db.transaction(() => {
+      migration.run();
+      markApplied.run(migration.id);
+    })();
+  }
+}
+
+function addColumnIfMissing(table: string, column: string, definition: string): void {
+  const columns = db.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((entry) => entry.name);
+  if (!columns.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }

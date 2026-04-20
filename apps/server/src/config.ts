@@ -13,6 +13,7 @@ export const config = {
   uploadAuthRequired: env.UPLOAD_AUTH_REQUIRED === "true",
   assetsAuthRequired: env.ASSETS_AUTH_REQUIRED === "true",
   imageCompressionEnabled: env.IMAGE_COMPRESSION_ENABLED !== "false",
+  imageCompressionLevel: env.IMAGE_COMPRESSION_LEVEL ?? "low",
   oidcIssuerUrl: env.OIDC_ISSUER_URL ?? "",
   oidcClientId: env.OIDC_CLIENT_ID ?? "",
   oidcClientSecret: env.OIDC_CLIENT_SECRET ?? "",

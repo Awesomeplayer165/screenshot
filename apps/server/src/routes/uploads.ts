@@ -9,7 +9,7 @@ import {
 import { config } from "../config";
 import { createReservedUpload, findUpload, markUploadComplete, markUploadFailed } from "../services/db";
 import { createId } from "../services/ids";
-import { optimizeImage } from "../services/compression";
+import { processImage } from "../services/compression";
 import { getMaxUploadBytes, getSettings } from "../services/settings";
 import { removeTemp, storeUpload } from "../services/storage";
 import { extensionForType, looksLikeImage, normalizeImageType } from "../services/validation";
@@ -31,7 +31,7 @@ uploads.post("/", async (c) => {
 
   const mimeType = normalizeImageType(payload.mimeType);
   if (!mimeType) {
-    return c.json<ApiErrorResponse>({ error: "Only PNG, JPEG, and WebP images are supported" }, 415);
+    return c.json<ApiErrorResponse>({ error: "Only PNG, JPEG, WebP, HEIC, and HEIF images are supported" }, 415);
   }
 
   const extension = extensionForType(mimeType);
@@ -80,7 +80,7 @@ uploads.put("/:id", async (c) => {
   const mimeType = normalizeImageType(c.req.header("content-type"));
   if (!mimeType) {
     markUploadFailed(id);
-    return c.json<ApiErrorResponse>({ error: "Only PNG, JPEG, and WebP images are supported" }, 415);
+    return c.json<ApiErrorResponse>({ error: "Only PNG, JPEG, WebP, HEIC, and HEIF images are supported" }, 415);
   }
 
   const body = await c.req.arrayBuffer();
@@ -100,14 +100,16 @@ uploads.put("/:id", async (c) => {
     return c.json<ApiErrorResponse>({ error: "Uploaded bytes do not match the image type" }, 415);
   }
 
-  const extension = extensionForType(mimeType);
+  let extension = extensionForType(mimeType);
 
   try {
-    const bytes = await optimizeImage(originalBytes, mimeType, getSettings().imageCompressionEnabled);
-    const stored = await storeUpload(id, extension, bytes);
+    const settings = getSettings();
+    const processed = await processImage(originalBytes, mimeType, settings.imageCompressionEnabled, settings.imageCompressionLevel);
+    extension = processed.extension;
+    const stored = await storeUpload(id, extension, processed.bytes);
     const completed = markUploadComplete({
       id,
-      mimeType,
+      mimeType: processed.mimeType,
       extension,
       sizeBytes: stored.sizeBytes,
       originalSizeBytes: originalBytes.byteLength,
@@ -131,6 +133,10 @@ uploads.put("/:id", async (c) => {
 
     if (error instanceof Error && "code" in error && error.code === "EEXIST") {
       return c.json<ApiErrorResponse>({ error: "Upload file already exists" }, 409);
+    }
+
+    if (error instanceof Error && error.message.includes("HEIC/HEIF")) {
+      return c.json<ApiErrorResponse>({ error: error.message }, 415);
     }
 
     throw error;

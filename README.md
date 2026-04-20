@@ -2,21 +2,22 @@
 
 Self-hosted screenshot upload service built with Bun, Hono, TypeScript, React, and local disk storage.
 
-The upload page accepts pasted, dropped, or selected images and immediately copies a public asset URL while the upload continues. Public asset URLs are intended to render inline in clients such as Discord, Slack, iMessage, and browsers.
+The upload page accepts pasted, dropped, or selected images and immediately copies a public asset URL while the upload continues. The intended flow is: open the page, paste a screenshot, switch back to the app where you want to share it, and paste the copied link. In normal use the image should be uploaded by the time the receiving app expands the URL.
 
 ## Features
 
-- Paste, drag/drop, or select PNG, JPEG, and WebP images.
+- Paste, drag/drop, or select PNG, JPEG, WebP, HEIC, and HEIF images.
 - Configurable upload size limit in MB.
 - Randomized public filenames.
 - Public inline asset serving from a separate asset origin.
 - Upload progress in the browser.
 - SQLite metadata and settings persistence.
-- Admin dashboard for upload management and runtime settings.
+- Admin dashboard for upload management, search, filtering, sorting, bulk delete, and runtime settings.
 - Generic OIDC login for admin access.
 - Optional OIDC protection for the upload UI.
 - Optional authentication for asset URLs.
-- Lossless image optimization for PNG and WebP. JPEG files are stored unchanged to avoid quality loss.
+- Configurable image optimization levels. PNG and WebP are optimized losslessly. JPEG files are stored unchanged to avoid quality loss. HEIC and HEIF are converted to JPEG when the image processor is available.
+- Automatic SQLite migrations on startup.
 - Docker and Docker Compose support.
 
 GIF uploads are not supported.
@@ -25,8 +26,8 @@ GIF uploads are not supported.
 
 One Bun process serves both origins. The server switches behavior based on the `Host` header.
 
-- App/API origin: `https://screenshot.jacobtrentini.com`
-- Asset origin: `https://assets.cdn.jacobtrentini.com`
+- App/API origin: `https://screenshot.example.com`
+- Asset origin: `https://assets.example.com`
 
 Public asset routes are unauthenticated by default. The admin dashboard is enabled by default, but requires OIDC to be configured before sign-in can succeed.
 
@@ -71,8 +72,8 @@ The container listens on port `3005` and stores images plus SQLite metadata in t
 ```txt
 PORT=3005
 DATA_DIR=/data
-PUBLIC_APP_ORIGIN=https://screenshot.jacobtrentini.com
-PUBLIC_ASSET_ORIGIN=https://assets.cdn.jacobtrentini.com
+PUBLIC_APP_ORIGIN=https://screenshot.example.com
+PUBLIC_ASSET_ORIGIN=https://assets.example.com
 MAX_UPLOAD_MB=25
 ID_LENGTH=12
 
@@ -80,24 +81,25 @@ ADMIN_DASHBOARD_ENABLED=true
 UPLOAD_AUTH_REQUIRED=false
 ASSETS_AUTH_REQUIRED=false
 IMAGE_COMPRESSION_ENABLED=true
+IMAGE_COMPRESSION_LEVEL=low
 
 OIDC_ISSUER_URL=https://id.example.com
 OIDC_CLIENT_ID=screenshot
 OIDC_CLIENT_SECRET=change-me
-OIDC_REDIRECT_URI=https://screenshot.jacobtrentini.com/auth/callback
+OIDC_REDIRECT_URI=https://screenshot.example.com/auth/callback
 ADMIN_EMAIL=you@example.com
 SESSION_SECRET=change-me
-COOKIE_DOMAIN=.jacobtrentini.com
+COOKIE_DOMAIN=.example.com
 ```
 
-Most runtime settings can also be changed from the admin dashboard. Those changes are stored in SQLite and override the environment defaults.
+Most runtime settings can also be changed from the admin dashboard. Those changes are stored in SQLite and override the environment defaults. Database migrations are applied automatically on startup and tracked in `schema_migrations`.
 
 ## OIDC
 
 Create an OIDC client with this redirect URI:
 
 ```txt
-https://screenshot.jacobtrentini.com/auth/callback
+https://screenshot.example.com/auth/callback
 ```
 
 The admin dashboard only permits the configured `ADMIN_EMAIL`. Upload UI authentication is disabled by default and can be enabled from admin settings. Asset authentication is also disabled by default because enabling it prevents unauthenticated clients from rendering shared images.
@@ -107,11 +109,11 @@ The admin dashboard only permits the configured `ADMIN_EMAIL`. Upload UI authent
 Example Caddy configuration:
 
 ```caddyfile
-screenshot.jacobtrentini.com {
+screenshot.example.com {
   reverse_proxy 127.0.0.1:3005
 }
 
-assets.cdn.jacobtrentini.com {
+assets.example.com {
   reverse_proxy 127.0.0.1:3005
 }
 ```

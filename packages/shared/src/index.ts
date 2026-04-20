@@ -4,10 +4,13 @@ export const MAX_UPLOAD_BYTES = DEFAULT_UPLOAD_LIMIT_MB * 1024 * 1024;
 export const SUPPORTED_IMAGE_TYPES = {
   "image/png": "png",
   "image/jpeg": "jpg",
-  "image/webp": "webp"
+  "image/webp": "webp",
+  "image/heic": "jpg",
+  "image/heif": "jpg"
 } as const;
 
 export type SupportedImageType = keyof typeof SUPPORTED_IMAGE_TYPES;
+export type CompressionLevel = "low" | "medium" | "high";
 
 export type UploadStatus = "reserved" | "complete" | "failed";
 
@@ -53,6 +56,7 @@ export type AppSettings = {
   assetsAuthRequired: boolean;
   maxUploadMb: number;
   imageCompressionEnabled: boolean;
+  imageCompressionLevel: CompressionLevel;
   oidcIssuerUrl: string;
   oidcClientId: string;
   oidcRedirectUri: string;

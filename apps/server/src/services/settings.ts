@@ -25,10 +25,10 @@ function compressionLevelSetting(): CompressionLevel {
 }
 
 export function getSettings(): AppSettings {
-  const oidcIssuerUrl = stringSetting("oidcIssuerUrl", config.oidcIssuerUrl);
-  const oidcClientId = stringSetting("oidcClientId", config.oidcClientId);
-  const oidcRedirectUri = stringSetting("oidcRedirectUri", config.oidcRedirectUri);
-  const adminEmail = stringSetting("adminEmail", config.adminEmail);
+  const oidcIssuerUrl = config.oidcIssuerUrl;
+  const oidcClientId = config.oidcClientId;
+  const oidcRedirectUri = config.oidcRedirectUri;
+  const adminEmail = config.adminEmail;
 
   return {
     adminDashboardEnabled: booleanSetting("adminDashboardEnabled", config.adminDashboardEnabled),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Clipboard, ExternalLink, ImagePlus, Loader2, Settings, Upload, XCircle } from "lucide-react";
+import { ArrowRight, Check, Clipboard, ExternalLink, ImagePlus, Loader2, Settings, Upload, XCircle } from "lucide-react";
 import type {
   ApiErrorResponse,
   ReserveUploadRequest,
@@ -81,9 +81,9 @@ function UploadPage() {
       const reserved = await reserveUpload(file.type);
       try {
         await copyToClipboard(reserved.assetUrl);
-        setToast("Link copied. Switch apps now; upload will finish in the background.");
+        setToast("Link copied");
       } catch {
-        setToast("Link ready. Switch apps now; upload will finish in the background.");
+        setToast("Link ready");
       }
 
       setUpload((current) =>
@@ -198,7 +198,7 @@ function UploadPage() {
 
             <div className="copy">
               <h1>{statusTitle}</h1>
-              <p>{statusText}</p>
+              {upload?.state === "complete" ? <UploadSizeSummary upload={upload} /> : <p>{statusText}</p>}
             </div>
 
             {upload?.previewUrl ? (
@@ -354,14 +354,28 @@ function titleForState(state: UploadState): string {
 }
 
 function detailForUpload(upload: CurrentUpload): string {
-  if (upload.state === "complete") {
-    const original = upload.originalSizeBytes ?? upload.file.size;
-    const uploaded = upload.uploadedSizeBytes ?? original;
-    return `Image uploaded. ${formatBytes(original)} --> ${formatBytes(uploaded)}.`;
-  }
+  if (upload.state === "complete") return "Image uploaded.";
   if (upload.state === "error") return "The link was not created for this image.";
-  if (upload.assetUrl) return "The link is already copied. Switch apps now; upload will finish in the background.";
+  if (upload.assetUrl) return "The link is already copied.";
   return `${formatBytes(upload.file.size)} image selected.`;
+}
+
+function UploadSizeSummary({ upload }: { upload: CurrentUpload }) {
+  const original = upload.originalSizeBytes ?? upload.file.size;
+  const uploaded = upload.uploadedSizeBytes ?? original;
+
+  if (original === uploaded) {
+    return <p>Image uploaded. {formatBytes(uploaded)}.</p>;
+  }
+
+  return (
+    <p className="size-summary">
+      <span>Image uploaded.</span>
+      <strong>{formatBytes(original)}</strong>
+      <ArrowRight size={15} />
+      <strong>{formatBytes(uploaded)}</strong>
+    </p>
+  );
 }
 
 function iconForState(state: UploadState) {

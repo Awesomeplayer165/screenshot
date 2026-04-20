@@ -1,5 +1,6 @@
 FROM oven/bun:1.3.10 AS deps
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libvips42 libheif1 libde265-0 && rm -rf /var/lib/apt/lists/*
 COPY package.json bun.lock bunfig.toml tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/server/package.json apps/server/package.json
@@ -12,9 +13,11 @@ RUN bun run build
 
 FROM oven/bun:1.3.10 AS runner
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libvips42 libheif1 libde265-0 && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV PORT=3005
 ENV DATA_DIR=/data
+ENV SHARP_FORCE_GLOBAL_LIBVIPS=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/bunfig.toml ./bunfig.toml

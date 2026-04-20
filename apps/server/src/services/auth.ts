@@ -130,7 +130,7 @@ export async function finishLogin(c: Context): Promise<Response> {
     maxAge: 60 * 60 * 24 * 14
   });
 
-  return c.redirect("/admin");
+  return c.redirect("/admin?auth=callback");
 }
 
 export function logout(c: Context): Response {

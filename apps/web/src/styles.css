@@ -34,7 +34,6 @@ select {
   place-items: center;
   padding: 24px;
   background: #060708;
-  animation: page-fade-in 420ms ease both;
 }
 
 .ambient-background {
@@ -163,6 +162,18 @@ select {
 .copy {
   display: grid;
   gap: 8px;
+}
+
+.size-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.size-summary strong {
+  color: #f4f7f5;
+  font-weight: 750;
 }
 
 h1 {
@@ -343,7 +354,6 @@ p {
     linear-gradient(315deg, rgba(204, 90, 59, 0.13), transparent 38%),
     #060708;
   color: #f4f7f5;
-  animation: page-fade-in 420ms ease both;
 }
 
 .admin-center {
@@ -703,15 +713,6 @@ p {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes page-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
   }
 }
 

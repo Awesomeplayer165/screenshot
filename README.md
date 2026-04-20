@@ -2,7 +2,7 @@
 
 Self-hosted screenshot upload service built with Bun, Hono, TypeScript, React, and local disk storage.
 
-The upload page accepts pasted, dropped, or selected images and immediately copies a public asset URL while the upload continues. The intended flow is: open the page, paste a screenshot, switch back to the app where you want to share it, and paste the copied link. In normal use the image should be uploaded by the time the receiving app expands the URL.
+The upload page accepts pasted, dropped, or selected images and immediately copies a public asset URL while the upload continues. The intended flow is: open the page, paste a screenshot, return to the app where you want to share it, and paste the copied link. In normal use the image should be uploaded by the time the receiving app expands the URL.
 
 ## Features
 
@@ -16,7 +16,7 @@ The upload page accepts pasted, dropped, or selected images and immediately copi
 - Generic OIDC login for admin access.
 - Optional OIDC protection for the upload UI.
 - Optional authentication for asset URLs.
-- Configurable image optimization levels. PNG and WebP are optimized losslessly. JPEG files are stored unchanged to avoid quality loss. HEIC and HEIF are converted to JPEG when the image processor is available.
+- Configurable image optimization levels. PNG and WebP are optimized losslessly. JPEG files are stored unchanged to avoid quality loss. HEIC and HEIF are converted to JPEG.
 - Optional pruning by approximate file age and total stored size.
 - Automatic SQLite migrations on startup.
 - Docker and Docker Compose support.
@@ -99,6 +99,12 @@ Runtime settings are stored in SQLite:
 - Prune keep-days
 - Prune max folder GB
 
+Generate a stable session secret for production and keep it unchanged across restarts and replicas:
+
+```sh
+openssl rand -base64 32
+```
+
 Prune settings are intentionally approximate. Cleanup uses upload metadata in SQLite and runs on startup and opportunistically after uploads, avoiding expensive recursive folder scans.
 
 Database migrations are applied automatically on startup and tracked in `schema_migrations`.
@@ -112,6 +118,15 @@ https://screenshot.example.com/auth/callback
 ```
 
 The admin dashboard only permits the configured `ADMIN_EMAIL`. Upload UI authentication is disabled by default and can be enabled from admin settings. Asset authentication is also disabled by default because enabling it prevents unauthenticated clients from rendering shared images.
+
+OIDC login depends on the browser accepting the session cookie after the callback. For production:
+
+- `PUBLIC_APP_ORIGIN` should be the public HTTPS app origin.
+- `OIDC_REDIRECT_URI` should exactly match the provider callback URL.
+- `COOKIE_DOMAIN` should be blank for a single host, or a parent domain such as `.example.com` when sharing cookies across subdomains. Do not include a scheme or path.
+- `SESSION_SECRET` must be stable. Changing it invalidates existing sessions.
+
+The Docker image includes native image libraries for Sharp, including libvips and HEIF decoding support. If you deploy without Docker, install the equivalent `libvips`, `libheif`, and `libde265` packages for your Linux distribution so HEIC and HEIF conversion can run.
 
 ## Reverse Proxy
 

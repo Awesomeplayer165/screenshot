@@ -20,7 +20,10 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (state === "unauthorized") window.location.assign("/auth/login");
+    if (state !== "unauthorized") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auth") === "callback") return;
+    window.location.assign("/auth/login");
   }, [state]);
 
   useEffect(() => {
@@ -99,7 +102,14 @@ export function AdminDashboard() {
   }
 
   if (state === "unauthorized") {
-    return <AdminSkeleton />;
+    return (
+      <AdminShell title="Could not stay signed in" subtitle="OIDC completed, but the admin session cookie was not accepted. Check COOKIE_DOMAIN, PUBLIC_APP_ORIGIN, HTTPS, and SESSION_SECRET.">
+        <Button onClick={() => (window.location.href = "/auth/login")}>
+          <ExternalLink size={16} />
+          Sign in again
+        </Button>
+      </AdminShell>
+    );
   }
 
   if (state === "disabled") {

@@ -87,6 +87,24 @@ const listUploadsQuery = db.query<UploadRecord, [number]>(`
   LIMIT ?
 `);
 
+const listCompletedUploadsForCleanupQuery = db.query<UploadRecord, []>(`
+  SELECT
+    id,
+    status,
+    mime_type AS mimeType,
+    extension,
+    size_bytes AS sizeBytes,
+    original_size_bytes AS originalSizeBytes,
+    storage_path AS storagePath,
+    public_url AS publicUrl,
+    created_at AS createdAt,
+    completed_at AS completedAt,
+    sha256
+  FROM uploads
+  WHERE status = 'complete'
+  ORDER BY COALESCE(completed_at, created_at) ASC
+`);
+
 const deleteUploadQuery = db.query(`DELETE FROM uploads WHERE id = ?`);
 const getSettingQuery = db.query<{ value: string }, [string]>(`SELECT value FROM settings WHERE key = ?`);
 const setSettingQuery = db.query(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`);
@@ -139,11 +157,11 @@ export function deleteUpload(id: string): boolean {
   return deleteUploadQuery.run(id).changes === 1;
 }
 
-export function getSetting(key: keyof AppSettings | "oidcClientSecret"): string | null {
+export function getSetting(key: keyof AppSettings): string | null {
   return getSettingQuery.get(key)?.value ?? null;
 }
 
-export function setSetting(key: keyof AppSettings | "oidcClientSecret", value: string): void {
+export function setSetting(key: keyof AppSettings, value: string): void {
   setSettingQuery.run(key, value);
 }
 
@@ -157,6 +175,10 @@ export function findSession(id: string): { id: string; email: string; expiresAt:
 
 export function deleteSession(id: string): void {
   deleteSessionQuery.run(id);
+}
+
+export function listCompletedUploadsForCleanup(): UploadRecord[] {
+  return listCompletedUploadsForCleanupQuery.all();
 }
 
 function runMigrations(): void {

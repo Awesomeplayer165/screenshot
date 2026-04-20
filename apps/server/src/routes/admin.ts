@@ -22,7 +22,7 @@ admin.get("/summary", (c) => {
 });
 
 admin.put("/settings", async (c) => {
-  const payload = (await c.req.json()) as Partial<AppSettings> & { oidcClientSecret?: string };
+  const payload = (await c.req.json()) as Partial<AppSettings>;
   return c.json({ settings: updateSettings(payload) });
 });
 

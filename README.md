@@ -17,6 +17,7 @@ The upload page accepts pasted, dropped, or selected images and immediately copi
 - Optional OIDC protection for the upload UI.
 - Optional authentication for asset URLs.
 - Configurable image optimization levels. PNG and WebP are optimized losslessly. JPEG files are stored unchanged to avoid quality loss. HEIC and HEIF are converted to JPEG when the image processor is available.
+- Optional pruning by approximate file age and total stored size.
 - Automatic SQLite migrations on startup.
 - Docker and Docker Compose support.
 
@@ -69,19 +70,14 @@ The container listens on port `3005` and stores images plus SQLite metadata in t
 
 ## Configuration
 
+Environment variables are for deployment identity, paths, and secrets. Runtime behavior is configured in the admin dashboard and persisted in SQLite.
+
 ```txt
 PORT=3005
 DATA_DIR=/data
 PUBLIC_APP_ORIGIN=https://screenshot.example.com
 PUBLIC_ASSET_ORIGIN=https://assets.example.com
-MAX_UPLOAD_MB=25
 ID_LENGTH=12
-
-ADMIN_DASHBOARD_ENABLED=true
-UPLOAD_AUTH_REQUIRED=false
-ASSETS_AUTH_REQUIRED=false
-IMAGE_COMPRESSION_ENABLED=true
-IMAGE_COMPRESSION_LEVEL=low
 
 OIDC_ISSUER_URL=https://id.example.com
 OIDC_CLIENT_ID=screenshot
@@ -92,7 +88,20 @@ SESSION_SECRET=change-me
 COOKIE_DOMAIN=.example.com
 ```
 
-Most runtime settings can also be changed from the admin dashboard. Those changes are stored in SQLite and override the environment defaults. Database migrations are applied automatically on startup and tracked in `schema_migrations`.
+Runtime settings are stored in SQLite:
+
+- Upload limit in MB
+- Admin dashboard enabled
+- Upload UI authentication
+- Asset authentication
+- Image compression enabled
+- Compression level
+- Prune keep-days
+- Prune max folder GB
+
+Prune settings are intentionally approximate. Cleanup uses upload metadata in SQLite and runs on startup and opportunistically after uploads, avoiding expensive recursive folder scans.
+
+Database migrations are applied automatically on startup and tracked in `schema_migrations`.
 
 ## OIDC
 
@@ -131,3 +140,7 @@ assets.example.com {
 ```
 
 Uploads are written to `tmp` first, then atomically moved into `assets`.
+
+## License
+
+MIT

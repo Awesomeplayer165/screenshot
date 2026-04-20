@@ -437,10 +437,12 @@ p {
   letter-spacing: 0;
 }
 
-.oidc-fields {
+.deployment-fields {
   margin-bottom: 18px;
   padding-top: 18px;
   border-top: 1px solid rgba(244, 247, 245, 0.09);
+  display: grid;
+  gap: 12px;
 }
 
 .field {
@@ -487,6 +489,10 @@ p {
 .table-toolbar select:focus,
 .search-field input:focus {
   border-color: rgba(91, 190, 205, 0.52);
+}
+
+.readonly-field input {
+  color: #8f9d9a;
 }
 
 .toggle-row {

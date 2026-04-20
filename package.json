@@ -1,6 +1,8 @@
 {
   "name": "screenshot-service",
   "private": true,
+  "description": "Self-hosted screenshot upload service with public asset links and OIDC admin controls.",
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "apps/*",

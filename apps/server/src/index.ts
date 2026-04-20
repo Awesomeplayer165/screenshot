@@ -9,10 +9,12 @@ import { auth } from "./routes/auth";
 import { health } from "./routes/health";
 import { uploads } from "./routes/uploads";
 import { getCurrentUser } from "./services/auth";
+import { maybeRunCleanup } from "./services/cleanup";
 import { getSettings } from "./services/settings";
 import { ensureStorage } from "./services/storage";
 
 await ensureStorage();
+void maybeRunCleanup(true);
 
 const app = new Hono();
 const webDist = join(import.meta.dir, "../../web/dist");

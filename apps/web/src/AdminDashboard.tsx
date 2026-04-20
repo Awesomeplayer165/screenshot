@@ -12,7 +12,7 @@ type SortDirection = "asc" | "desc";
 export function AdminDashboard() {
   const [state, setState] = useState<LoadState>("loading");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
-  const [settings, setSettings] = useState<(AppSettings & { oidcClientSecret?: string }) | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export function AdminDashboard() {
 
     const data = (await response.json()) as AdminSummary;
     setSummary(data);
-    setSettings({ ...data.settings, oidcClientSecret: "" });
+    setSettings(data.settings);
     setState("ready");
   }
 
@@ -70,7 +70,7 @@ export function AdminDashboard() {
     }
 
     const payload = (await response.json()) as { settings: AppSettings };
-    setSettings({ ...payload.settings, oidcClientSecret: "" });
+    setSettings(payload.settings);
     setSummary((current) => (current ? { ...current, settings: payload.settings } : current));
     setToast("Settings saved");
   }
@@ -103,7 +103,7 @@ export function AdminDashboard() {
   }
 
   if (state === "disabled") {
-    return <AdminShell title="Admin disabled" subtitle="The dashboard is disabled by configuration or persisted settings." />;
+    return <AdminShell title="Admin disabled" subtitle="The dashboard is disabled in persisted settings." />;
   }
 
   if (state === "error" || !summary || !settings) {
@@ -201,34 +201,35 @@ export function AdminDashboard() {
                 onChange={(event) => setSettings({ ...settings, maxUploadMb: Number(event.currentTarget.value) })}
               />
             </label>
-          </div>
-
-          <div className="oidc-fields">
+            <div className="settings-section-title">Prune</div>
             <label className="field">
-              <span>OIDC issuer URL</span>
-              <input value={settings.oidcIssuerUrl} onChange={(event) => setSettings({ ...settings, oidcIssuerUrl: event.currentTarget.value })} />
-            </label>
-            <label className="field">
-              <span>OIDC client ID</span>
-              <input value={settings.oidcClientId} onChange={(event) => setSettings({ ...settings, oidcClientId: event.currentTarget.value })} />
-            </label>
-            <label className="field">
-              <span>OIDC client secret</span>
+              <span>Keep days</span>
               <input
-                type="password"
-                value={settings.oidcClientSecret ?? ""}
-                placeholder="Leave blank to keep current secret"
-                onChange={(event) => setSettings({ ...settings, oidcClientSecret: event.currentTarget.value })}
+                type="number"
+                min="0"
+                step="1"
+                value={settings.pruneDays}
+                onChange={(event) => setSettings({ ...settings, pruneDays: Number(event.currentTarget.value) })}
               />
             </label>
             <label className="field">
-              <span>Redirect URI</span>
-              <input value={settings.oidcRedirectUri} onChange={(event) => setSettings({ ...settings, oidcRedirectUri: event.currentTarget.value })} />
+              <span>Max folder GB</span>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={settings.pruneGb}
+                onChange={(event) => setSettings({ ...settings, pruneGb: Number(event.currentTarget.value) })}
+              />
             </label>
-            <label className="field">
-              <span>Allowed email</span>
-              <input value={settings.adminEmail} onChange={(event) => setSettings({ ...settings, adminEmail: event.currentTarget.value })} />
-            </label>
+          </div>
+
+          <div className="deployment-fields">
+            <div className="settings-section-title">Deployment</div>
+            <ReadOnlyField label="OIDC issuer" value={settings.oidcIssuerUrl || "Not configured"} />
+            <ReadOnlyField label="OIDC client ID" value={settings.oidcClientId || "Not configured"} />
+            <ReadOnlyField label="Redirect URI" value={settings.oidcRedirectUri || "Not configured"} />
+            <ReadOnlyField label="Allowed email" value={settings.adminEmail || "Not configured"} />
           </div>
 
           <Button onClick={() => void saveSettings()}>
@@ -249,6 +250,15 @@ export function AdminDashboard() {
 
       <Toast message={toast} />
     </main>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <label className="field readonly-field">
+      <span>{label}</span>
+      <input readOnly value={value} />
+    </label>
   );
 }
 

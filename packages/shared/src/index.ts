@@ -57,6 +57,8 @@ export type AppSettings = {
   maxUploadMb: number;
   imageCompressionEnabled: boolean;
   imageCompressionLevel: CompressionLevel;
+  pruneDays: number;
+  pruneGb: number;
   oidcIssuerUrl: string;
   oidcClientId: string;
   oidcRedirectUri: string;

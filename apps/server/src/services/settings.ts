@@ -37,6 +37,8 @@ export function getSettings(): AppSettings {
     maxUploadMb: numberSetting("maxUploadMb", config.defaultUploadLimitMb),
     imageCompressionEnabled: booleanSetting("imageCompressionEnabled", config.imageCompressionEnabled),
     imageCompressionLevel: compressionLevelSetting(),
+    pruneDays: numberSetting("pruneDays", config.pruneDays),
+    pruneGb: numberSetting("pruneGb", config.pruneGb),
     oidcIssuerUrl,
     oidcClientId,
     oidcRedirectUri,
@@ -51,7 +53,7 @@ export function getMaxUploadBytes(): number {
   return Math.round(getSettings().maxUploadMb * 1024 * 1024);
 }
 
-export function updateSettings(input: Partial<AppSettings> & { oidcClientSecret?: string }): AppSettings {
+export function updateSettings(input: Partial<AppSettings>): AppSettings {
   const booleans: Array<keyof AppSettings> = ["adminDashboardEnabled", "uploadAuthRequired", "assetsAuthRequired", "imageCompressionEnabled"];
   for (const key of booleans) {
     if (typeof input[key] === "boolean") setSetting(key, String(input[key]));
@@ -61,19 +63,20 @@ export function updateSettings(input: Partial<AppSettings> & { oidcClientSecret?
     setSetting("maxUploadMb", String(input.maxUploadMb));
   }
 
-  const strings: Array<keyof AppSettings> = ["imageCompressionLevel", "oidcIssuerUrl", "oidcClientId", "oidcRedirectUri", "adminEmail"];
+  for (const key of ["pruneDays", "pruneGb"] as Array<keyof AppSettings>) {
+    const value = input[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) setSetting(key, String(value));
+  }
+
+  const strings: Array<keyof AppSettings> = ["imageCompressionLevel"];
   for (const key of strings) {
     const value = input[key];
     if (typeof value === "string") setSetting(key, value.trim());
-  }
-
-  if (typeof input.oidcClientSecret === "string" && input.oidcClientSecret.trim()) {
-    setSetting("oidcClientSecret", input.oidcClientSecret.trim());
   }
 
   return getSettings();
 }
 
 export function getOidcClientSecret(): string {
-  return getSetting("oidcClientSecret") ?? config.oidcClientSecret;
+  return config.oidcClientSecret;
 }

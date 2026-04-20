@@ -10,6 +10,7 @@ import { config } from "../config";
 import { createReservedUpload, findUpload, markUploadComplete, markUploadFailed } from "../services/db";
 import { createId } from "../services/ids";
 import { processImage } from "../services/compression";
+import { maybeRunCleanup } from "../services/cleanup";
 import { getMaxUploadBytes, getSettings } from "../services/settings";
 import { removeTemp, storeUpload } from "../services/storage";
 import { extensionForType, looksLikeImage, normalizeImageType } from "../services/validation";
@@ -120,6 +121,8 @@ uploads.put("/:id", async (c) => {
     if (!completed) {
       return c.json<ApiErrorResponse>({ error: "Upload was already changed" }, 409);
     }
+
+    void maybeRunCleanup();
 
     return c.json<UploadCompleteResponse>({
       id,

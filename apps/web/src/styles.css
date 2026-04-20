@@ -1,0 +1,346 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #060708;
+  color: #f4f7f5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(38, 95, 105, 0.24), transparent 36%),
+    linear-gradient(315deg, rgba(204, 90, 59, 0.18), transparent 38%),
+    #060708;
+}
+
+.hero {
+  width: min(100%, 720px);
+}
+
+.upload-panel {
+  position: relative;
+  overflow: hidden;
+  min-height: 560px;
+  border: 1px solid rgba(244, 247, 245, 0.11);
+  border-radius: 8px;
+  background: rgba(13, 16, 17, 0.86);
+  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.48);
+  outline: none;
+  backdrop-filter: blur(18px);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.upload-panel:focus-visible,
+.upload-panel.is-dragging {
+  border-color: rgba(91, 190, 205, 0.5);
+  box-shadow: 0 28px 96px rgba(45, 144, 161, 0.26);
+  transform: translateY(-1px);
+}
+
+.panel-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(66, 144, 154, 0.22), transparent 34%),
+    radial-gradient(circle at 86% 18%, rgba(204, 90, 59, 0.16), transparent 24%);
+  opacity: 0.9;
+}
+
+.upload-content {
+  position: relative;
+  z-index: 1;
+  min-height: 560px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: 18px;
+  padding: 34px;
+}
+
+.upload-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(244, 247, 245, 0.12);
+  border-radius: 8px;
+  color: #effbff;
+  background: #1f6670;
+  box-shadow: 0 16px 34px rgba(31, 102, 112, 0.28);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.upload-icon:hover {
+  background: #287885;
+  transform: translateY(-1px);
+}
+
+.upload-icon:focus-visible {
+  outline: 2px solid rgba(111, 207, 224, 0.72);
+  outline-offset: 3px;
+}
+
+.upload-icon:disabled {
+  cursor: wait;
+  transform: none;
+}
+
+.is-complete .upload-icon {
+  background: #3f8454;
+}
+
+.copy {
+  display: grid;
+  gap: 8px;
+}
+
+h1 {
+  margin: 0;
+  color: #f4f7f5;
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+p {
+  max-width: 520px;
+  margin: 0;
+  color: #9bacaa;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.preview,
+.empty-preview {
+  width: 100%;
+  min-height: 220px;
+  max-height: 340px;
+  align-self: stretch;
+  border: 1px solid rgba(244, 247, 245, 0.1);
+  border-radius: 8px;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.035) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.035) 75%);
+  background-color: rgba(255, 255, 255, 0.035);
+  background-position:
+    0 0,
+    0 10px,
+    10px -10px,
+    -10px 0;
+  background-size: 20px 20px;
+  animation: fade-in 220ms ease both;
+}
+
+.preview {
+  object-fit: contain;
+}
+
+.empty-preview {
+  display: block;
+}
+
+.progress-wrap {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  color: #9bacaa;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(244, 247, 245, 0.1);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1e4f5c, #4d796b, #bf523a);
+  transition: width 160ms ease;
+}
+
+.url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.url-row input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  color: #f4f7f5;
+  border: 1px solid rgba(244, 247, 245, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+.error-text {
+  color: #ff8e8e;
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.button {
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.button-primary {
+  color: #ffffff;
+  background: #1f6670;
+}
+
+.button-secondary {
+  color: #f4f7f5;
+  border-color: rgba(244, 247, 245, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.button-ghost {
+  color: #f4f7f5;
+  background: transparent;
+}
+
+.file-input {
+  display: none;
+}
+
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 20;
+  padding: 12px 14px;
+  color: #071012;
+  background: #d8fbff;
+  border-radius: 8px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.38);
+  animation: toast-in 180ms ease both;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    padding: 14px;
+    place-items: stretch;
+  }
+
+  .hero {
+    align-self: center;
+  }
+
+  .upload-panel,
+  .upload-content {
+    min-height: 540px;
+  }
+
+  .upload-content {
+    padding: 22px;
+  }
+
+  h1 {
+    font-size: 32px;
+  }
+
+  .preview,
+  .empty-preview {
+    min-height: 190px;
+  }
+}

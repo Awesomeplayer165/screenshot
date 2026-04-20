@@ -1,0 +1,18 @@
+services:
+  screenshot:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DATA_DIR: "/data"
+      PUBLIC_APP_ORIGIN: "https://screenshot.jacobtrentini.com"
+      PUBLIC_ASSET_ORIGIN: "https://assets.cdn.jacobtrentini.com"
+      MAX_UPLOAD_BYTES: "26214400"
+      ID_LENGTH: "12"
+    volumes:
+      - screenshot-data:/data
+
+volumes:
+  screenshot-data:

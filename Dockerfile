@@ -13,7 +13,7 @@ RUN bun run build
 FROM oven/bun:1.3.10 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3005
 ENV DATA_DIR=/data
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
@@ -21,6 +21,6 @@ COPY --from=build /app/bunfig.toml ./bunfig.toml
 COPY --from=build /app/packages ./packages
 COPY --from=build /app/apps/server ./apps/server
 COPY --from=build /app/apps/web/dist ./apps/web/dist
-EXPOSE 3000
+EXPOSE 3005
 VOLUME ["/data"]
 CMD ["bun", "--filter", "@screenshot/server", "start"]

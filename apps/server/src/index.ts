@@ -3,9 +3,13 @@ import { join, normalize } from "node:path";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { config, isAssetHost } from "./config";
+import { admin } from "./routes/admin";
 import { assets } from "./routes/assets";
+import { auth } from "./routes/auth";
 import { health } from "./routes/health";
 import { uploads } from "./routes/uploads";
+import { getCurrentUser } from "./services/auth";
+import { getSettings } from "./services/settings";
 import { ensureStorage } from "./services/storage";
 
 await ensureStorage();
@@ -24,16 +28,55 @@ const mimeTypes: Record<string, string> = {
 app.use(logger());
 
 app.route("/", health);
+app.route("/auth", auth);
 
 app.use("*", async (c, next) => {
   if (isAssetHost(c.req.header("host"))) {
+    if (getSettings().assetsAuthRequired && !getCurrentUser(c)) {
+      return c.json({ error: "Authentication required" }, 401);
+    }
+
     return assets.fetch(c.req.raw, c.env);
   }
 
   await next();
 });
 
+app.use("*", async (c, next) => {
+  const pathname = new URL(c.req.url).pathname;
+  const settings = getSettings();
+
+  if (pathname.startsWith("/api/admin") && !settings.adminDashboardEnabled) {
+    return c.json({ error: "Admin dashboard is disabled" }, 404);
+  }
+
+  if (
+    settings.uploadAuthRequired &&
+    !pathname.startsWith("/auth") &&
+    !pathname.startsWith("/api/admin") &&
+    pathname !== "/healthz" &&
+    !getCurrentUser(c)
+  ) {
+    if (c.req.method === "GET" && !pathname.startsWith("/api/")) {
+      return c.redirect("/auth/login");
+    }
+
+    return c.json({ error: "Authentication required" }, 401);
+  }
+
+  await next();
+});
+
 app.route("/api/uploads", uploads);
+app.route("/api/admin", admin);
+app.use("*", async (c, next) => {
+  const pathname = new URL(c.req.url).pathname;
+  if ((c.req.method === "GET" || c.req.method === "HEAD") && /^\/[0-9A-Za-z]{6,64}\.(png|jpe?g|webp)$/.test(pathname)) {
+    return assets.fetch(c.req.raw, c.env);
+  }
+
+  await next();
+});
 
 if (existsSync(webDist)) {
   app.get("/assets/*", async (c) => {

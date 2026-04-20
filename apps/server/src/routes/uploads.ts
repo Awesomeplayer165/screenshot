@@ -9,6 +9,8 @@ import {
 import { config } from "../config";
 import { createReservedUpload, findUpload, markUploadComplete, markUploadFailed } from "../services/db";
 import { createId } from "../services/ids";
+import { optimizeImage } from "../services/compression";
+import { getMaxUploadBytes, getSettings } from "../services/settings";
 import { removeTemp, storeUpload } from "../services/storage";
 import { extensionForType, looksLikeImage, normalizeImageType } from "../services/validation";
 
@@ -45,7 +47,7 @@ uploads.post("/", async (c) => {
         id,
         uploadUrl: `${config.appOrigin.replace(/\/$/, "")}/api/uploads/${id}`,
         assetUrl: publicUrl,
-        maxUploadBytes: config.maxUploadBytes
+        maxUploadBytes: getMaxUploadBytes()
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes("UNIQUE")) continue;
@@ -68,10 +70,11 @@ uploads.put("/:id", async (c) => {
     return c.json<ApiErrorResponse>({ error: "Upload is no longer writable" }, 409);
   }
 
+  const maxUploadBytes = getMaxUploadBytes();
   const contentLength = Number(c.req.header("content-length") ?? 0);
-  if (contentLength > config.maxUploadBytes) {
+  if (contentLength > maxUploadBytes) {
     markUploadFailed(id);
-    return c.json<ApiErrorResponse>({ error: "Image is larger than 25 MB" }, 413);
+    return c.json<ApiErrorResponse>({ error: `Image is larger than ${getSettings().maxUploadMb} MB` }, 413);
   }
 
   const mimeType = normalizeImageType(c.req.header("content-type"));
@@ -86,13 +89,13 @@ uploads.put("/:id", async (c) => {
     return c.json<ApiErrorResponse>({ error: "Upload body is empty" }, 400);
   }
 
-  if (body.byteLength > config.maxUploadBytes) {
+  if (body.byteLength > maxUploadBytes) {
     markUploadFailed(id);
-    return c.json<ApiErrorResponse>({ error: "Image is larger than 25 MB" }, 413);
+    return c.json<ApiErrorResponse>({ error: `Image is larger than ${getSettings().maxUploadMb} MB` }, 413);
   }
 
-  const bytes = new Uint8Array(body);
-  if (!looksLikeImage(bytes, mimeType)) {
+  const originalBytes = new Uint8Array(body);
+  if (!looksLikeImage(originalBytes, mimeType)) {
     markUploadFailed(id);
     return c.json<ApiErrorResponse>({ error: "Uploaded bytes do not match the image type" }, 415);
   }
@@ -100,12 +103,14 @@ uploads.put("/:id", async (c) => {
   const extension = extensionForType(mimeType);
 
   try {
+    const bytes = await optimizeImage(originalBytes, mimeType, getSettings().imageCompressionEnabled);
     const stored = await storeUpload(id, extension, bytes);
     const completed = markUploadComplete({
       id,
       mimeType,
       extension,
       sizeBytes: stored.sizeBytes,
+      originalSizeBytes: originalBytes.byteLength,
       storagePath: stored.path,
       sha256: stored.sha256
     });
@@ -117,7 +122,8 @@ uploads.put("/:id", async (c) => {
     return c.json<UploadCompleteResponse>({
       id,
       assetUrl: assetUrlFor(id, extension),
-      sizeBytes: stored.sizeBytes
+      sizeBytes: stored.sizeBytes,
+      originalSizeBytes: originalBytes.byteLength
     });
   } catch (error) {
     await removeTemp(id, extension);

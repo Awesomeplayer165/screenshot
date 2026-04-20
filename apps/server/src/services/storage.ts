@@ -46,3 +46,12 @@ export async function removeTemp(id: string, extension: string): Promise<void> {
     // Best effort cleanup only.
   }
 }
+
+export async function deleteStoredAsset(path: string | null): Promise<void> {
+  if (!path) return;
+  try {
+    await unlink(path);
+  } catch {
+    // The admin delete action should be idempotent when the file is already gone.
+  }
+}

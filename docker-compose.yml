@@ -3,14 +3,25 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3005:3005"
     environment:
-      PORT: "3000"
+      PORT: "3005"
       DATA_DIR: "/data"
       PUBLIC_APP_ORIGIN: "https://screenshot.jacobtrentini.com"
       PUBLIC_ASSET_ORIGIN: "https://assets.cdn.jacobtrentini.com"
-      MAX_UPLOAD_BYTES: "26214400"
+      MAX_UPLOAD_MB: "25"
       ID_LENGTH: "12"
+      ADMIN_DASHBOARD_ENABLED: "true"
+      UPLOAD_AUTH_REQUIRED: "false"
+      ASSETS_AUTH_REQUIRED: "false"
+      IMAGE_COMPRESSION_ENABLED: "true"
+      OIDC_ISSUER_URL: ""
+      OIDC_CLIENT_ID: ""
+      OIDC_CLIENT_SECRET: ""
+      OIDC_REDIRECT_URI: "https://screenshot.jacobtrentini.com/auth/callback"
+      ADMIN_EMAIL: ""
+      SESSION_SECRET: ""
+      COOKIE_DOMAIN: ""
     volumes:
       - screenshot-data:/data
 

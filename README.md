@@ -1,44 +1,54 @@
 # Screenshot
 
-A tiny self-hosted screenshot paste/upload service.
+Self-hosted screenshot upload service built with Bun, Hono, TypeScript, React, and local disk storage.
+
+The upload page accepts pasted, dropped, or selected images and immediately copies a public asset URL while the upload continues. Public asset URLs are intended to render inline in clients such as Discord, Slack, iMessage, and browsers.
 
 ## Features
 
-- Paste a macOS screenshot directly into the page.
-- Drag/drop or choose a PNG, JPEG, or WebP image.
-- 25 MB upload limit.
-- Random public asset URL copied before upload finishes.
-- Upload progress.
-- Public inline image serving from the asset domain.
-- Local disk storage with SQLite metadata.
-- Bun, Hono, TypeScript, React, and minimal shadcn/ui-style components.
+- Paste, drag/drop, or select PNG, JPEG, and WebP images.
+- Configurable upload size limit in MB.
+- Randomized public filenames.
+- Public inline asset serving from a separate asset origin.
+- Upload progress in the browser.
+- SQLite metadata and settings persistence.
+- Admin dashboard for upload management and runtime settings.
+- Generic OIDC login for admin access.
+- Optional OIDC protection for the upload UI.
+- Optional authentication for asset URLs.
+- Lossless image optimization for PNG and WebP. JPEG files are stored unchanged to avoid quality loss.
+- Docker and Docker Compose support.
 
-GIF uploads are intentionally unsupported.
+GIF uploads are not supported.
 
-## Domains
+## Architecture
 
-- App and API: `https://screenshot.jacobtrentini.com`
-- Public assets: `https://assets.cdn.jacobtrentini.com`
+One Bun process serves both origins. The server switches behavior based on the `Host` header.
 
-Both domains can point at the same Bun process. The server switches behavior based on the `Host` header.
+- App/API origin: `https://screenshot.jacobtrentini.com`
+- Asset origin: `https://assets.cdn.jacobtrentini.com`
+
+Public asset routes are unauthenticated by default. The admin dashboard is enabled by default, but requires OIDC to be configured before sign-in can succeed.
 
 ## Local Development
 
 ```sh
 bun install
+bun run build
 bun run dev
 ```
 
-In another terminal:
+The default server port is `3005`. Development environment values are stored in `config/dev.env`.
+
+For Vite development:
 
 ```sh
 bun run dev:web
 ```
 
-The Vite dev server runs on `http://localhost:5173` and proxies `/api` to the Bun server on `http://localhost:3000`.
-The server dev environment is checked in at `config/dev.env`.
+Vite runs on `http://localhost:5173` and proxies `/api` and `/auth` to `http://localhost:3005`.
 
-## Production Build
+## Production
 
 ```sh
 bun install
@@ -54,32 +64,59 @@ The server serves the built frontend from `apps/web/dist`.
 docker compose up -d --build
 ```
 
-The app listens on port `3000` inside the container and stores files plus SQLite metadata in the `screenshot-data` volume.
+The container listens on port `3005` and stores images plus SQLite metadata in the `screenshot-data` volume.
 
-## Environment
+## Configuration
 
 ```txt
-PORT=3000
+PORT=3005
 DATA_DIR=/data
 PUBLIC_APP_ORIGIN=https://screenshot.jacobtrentini.com
 PUBLIC_ASSET_ORIGIN=https://assets.cdn.jacobtrentini.com
-MAX_UPLOAD_BYTES=26214400
+MAX_UPLOAD_MB=25
 ID_LENGTH=12
+
+ADMIN_DASHBOARD_ENABLED=true
+UPLOAD_AUTH_REQUIRED=false
+ASSETS_AUTH_REQUIRED=false
+IMAGE_COMPRESSION_ENABLED=true
+
+OIDC_ISSUER_URL=https://id.example.com
+OIDC_CLIENT_ID=screenshot
+OIDC_CLIENT_SECRET=change-me
+OIDC_REDIRECT_URI=https://screenshot.jacobtrentini.com/auth/callback
+ADMIN_EMAIL=you@example.com
+SESSION_SECRET=change-me
+COOKIE_DOMAIN=.jacobtrentini.com
 ```
 
-## Caddy Example
+Most runtime settings can also be changed from the admin dashboard. Those changes are stored in SQLite and override the environment defaults.
+
+## OIDC
+
+Create an OIDC client with this redirect URI:
+
+```txt
+https://screenshot.jacobtrentini.com/auth/callback
+```
+
+The admin dashboard only permits the configured `ADMIN_EMAIL`. Upload UI authentication is disabled by default and can be enabled from admin settings. Asset authentication is also disabled by default because enabling it prevents unauthenticated clients from rendering shared images.
+
+## Reverse Proxy
+
+Example Caddy configuration:
 
 ```caddyfile
 screenshot.jacobtrentini.com {
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy 127.0.0.1:3005
 }
 
 assets.cdn.jacobtrentini.com {
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy 127.0.0.1:3005
 }
 ```
 
-## Storage Layout
+## Storage
 
 ```txt
 /data

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Clipboard, ImagePlus, Loader2, Upload, XCircle } from "lucide-react";
+import { Check, Clipboard, ExternalLink, ImagePlus, Loader2, Upload, XCircle } from "lucide-react";
 import type {
   ApiErrorResponse,
   ReserveUploadRequest,
   ReserveUploadResponse,
   UploadCompleteResponse
 } from "@screenshot/shared";
-import { MAX_UPLOAD_BYTES } from "@screenshot/shared";
+import { AdminDashboard } from "./AdminDashboard";
 import { Button } from "./components/Button";
 import { Progress } from "./components/Progress";
 import { Toast } from "./components/Toast";
@@ -26,6 +26,11 @@ type CurrentUpload = {
 const SUPPORTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 export function App() {
+  if (window.location.pathname.startsWith("/admin")) return <AdminDashboard />;
+  return <UploadPage />;
+}
+
+function UploadPage() {
   const [upload, setUpload] = useState<CurrentUpload | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -55,11 +60,6 @@ export function App() {
 
     if (!SUPPORTED_TYPES.has(file.type)) {
       showError(file, "Only PNG, JPEG, and WebP images are supported.");
-      return;
-    }
-
-    if (file.size > MAX_UPLOAD_BYTES) {
-      showError(file, "Image is larger than 25 MB.");
       return;
     }
 
@@ -149,6 +149,7 @@ export function App() {
 
   return (
     <main className="shell">
+      <div className="ambient-background" aria-hidden="true" />
       <section className="hero">
         <div
           className={`upload-panel ${dragActive ? "is-dragging" : ""} ${upload?.state === "complete" ? "is-complete" : ""}`}
@@ -164,6 +165,12 @@ export function App() {
             setDragActive(false);
             const file = imageFromFileList(event.dataTransfer.files);
             if (file) void startUpload(file);
+          }}
+          onClick={(event) => {
+            const target = event.target as HTMLElement;
+            if (target.closest("button, input")) return;
+            if (upload?.state === "reserved" || upload?.state === "uploading") return;
+            fileInputRef.current?.click();
           }}
         >
           <div className="panel-glow" />
@@ -197,9 +204,10 @@ export function App() {
             ) : null}
 
             {upload?.assetUrl ? (
-              <div className="url-row">
+              <div className={`url-row ${upload.state === "complete" ? "has-open-action" : ""}`}>
                 <input readOnly value={upload.assetUrl} aria-label="Copied asset URL" />
                 <Button
+                  className="icon-button"
                   variant="secondary"
                   aria-label="Copy link"
                   onClick={() => {
@@ -208,6 +216,16 @@ export function App() {
                 >
                   <Clipboard size={16} />
                 </Button>
+                {upload.state === "complete" ? (
+                  <Button
+                    className="icon-button"
+                    variant="secondary"
+                    aria-label="Open image in new page"
+                    onClick={() => window.open(upload.assetUrl, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink size={16} />
+                  </Button>
+                ) : null}
               </div>
             ) : null}
 
